@@ -1,10 +1,8 @@
 """Email client implementation."""
 
-import asyncio
 import email
 import logging
-from email.message import EmailMessage
-from typing import AsyncGenerator, Optional, List
+from typing import AsyncGenerator, Optional
 
 import aioimaplib
 import aiosmtplib
