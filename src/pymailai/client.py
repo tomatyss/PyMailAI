@@ -107,37 +107,69 @@ class EmailClient:
         logger.debug("Found %d unread messages", len(message_numbers))
 
         for num in message_numbers:
-            # Ensure message number is properly formatted for IMAP
-            _, msg_data = await self._imap.fetch(str(num).encode(), "(RFC822)")
-            if not msg_data or not msg_data[0]:
-                logger.warning("No data returned for message %s", num)
+            try:
+                # Format message number for IMAP - ensure it's a valid message set
+                _, msg_data = await self._imap.fetch(num, "(RFC822)")
+                if not msg_data or not msg_data[0]:
+                    logger.warning("No data returned for message %s", num)
+                    continue
+            except Exception as e:
+                logger.error(f"Failed to fetch message {num}: {str(e)}")
                 continue
 
-            # IMAP fetch response format:
-            # [(b'1 (RFC822 {size}', b'raw email data'), b')']
-            # We need to ensure we're getting the actual email data
-            email_data = msg_data[0]
-            if isinstance(email_data, (list, tuple)) and len(email_data) > 1:
-                email_body = email_data[1]
-            else:
+            # IMAP fetch response can vary between servers
+            # Some return: [(b'1 (RFC822 {size}', b'raw email data'), b')']
+            # Others return: [b'28 FETCH (FLAGS (\\Seen) RFC822 {5324}', b'raw email data', b')']
+            logger.debug("Raw IMAP response for message %s: %s", num, msg_data)
+
+            email_body = None
+            for i, part in enumerate(msg_data):
+                logger.debug("Processing part %d: %s", i, part)
+                if isinstance(part, (list, tuple)):
+                    # Handle nested structure
+                    for j, item in enumerate(part):
+                        logger.debug("Processing nested item %d: %s", j, item)
+                        if isinstance(item, bytes):
+                            # Look for the actual email content
+                            # It should be a large chunk of bytes that doesn't start with FETCH
+                            # and isn't just a closing parenthesis
+                            if len(item) > 100 or (
+                                not item.startswith(b"FETCH")
+                                and not item.endswith(b")")
+                            ):
+                                email_body = item
+                                logger.debug("Found email body in nested structure")
+                                break
+                elif isinstance(part, bytes):
+                    # Same logic for non-nested parts
+                    if len(part) > 100 or (
+                        not part.startswith(b"FETCH") and not part.endswith(b")")
+                    ):
+                        email_body = part
+                        logger.debug("Found email body in flat structure")
+                        break
+
+            if not email_body:
                 logger.warning(
-                    "Unexpected message data format for message %s: %s", num, email_data
+                    "Could not find email body in message data for message %s: %s",
+                    num,
+                    msg_data,
                 )
                 continue
 
-            if not isinstance(email_body, bytes):
-                logger.warning(
-                    "Email body is not bytes for message %s: %s", num, type(email_body)
+            # Parse email message
+            try:
+                email_message = email.message_from_bytes(
+                    email_body, policy=email.policy.default
                 )
+                if not isinstance(email_message, EmailMessage):
+                    # Convert Message to EmailMessage if needed
+                    temp_message = EmailMessage()
+                    temp_message.set_content(email_message.as_string())
+                    email_message = temp_message
+            except Exception as e:
+                logger.error(f"Failed to parse email message: {str(e)}")
                 continue
-
-            # Create EmailMessage instead of Message
-            email_message = email.message_from_bytes(
-                email_body, policy=email.policy.default
-            )
-            if not isinstance(email_message, EmailMessage):
-                email_message = EmailMessage()
-                email_message.set_content(email_body.decode())
 
             # Convert to our EmailData format
             email_data = EmailData.from_email_message(email_message)
@@ -163,9 +195,12 @@ class EmailClient:
         message_numbers = data[0].decode().split()
 
         if message_numbers:
-            logger.debug("Marking message %s as read", message_id)
-            # Mark the message as seen - ensure message number is properly formatted
-            await self._imap.store(str(message_numbers[0]).encode(), "+FLAGS", "\\Seen")
+            try:
+                logger.debug("Marking message %s as read", message_id)
+                # Mark the message as seen using the raw message number
+                await self._imap.store(message_numbers[0], "+FLAGS", "\\Seen")
+            except Exception as e:
+                logger.error(f"Failed to mark message {message_id} as read: {str(e)}")
 
     async def __aenter__(self) -> "EmailClient":
         """Async context manager entry."""
