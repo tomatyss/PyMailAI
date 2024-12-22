@@ -1,6 +1,6 @@
 # PyMailAI
 
-[![Documentation Status](https://github.com/tomatyss/pymailai/actions/workflows/docs.yml/badge.svg)](https://tomatyss.github.io/pymailai/)
+[![Documentation Status](https://github.com/tomatyss/PyMailAI/actions/workflows/docs.yml/badge.svg)](https://tomatyss.github.io/PyMailAI/)
 
 PyMailAI is a Python package that enables AI agents to use email as an input/output interface. It provides simple wrappers to:
 1. Get prompts from incoming emails
@@ -164,7 +164,7 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 
 ## Documentation
 
-Full documentation is available at [https://tomatyss.github.io/pymailai/](https://tomatyss.github.io/pymailai/)
+Full documentation is available at [https://tomatyss.github.io/PyMailAI/](https://tomatyss.github.io/PyMailAI/)
 
 ## More Examples
 
