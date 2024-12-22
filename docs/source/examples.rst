@@ -46,6 +46,49 @@ The agent will monitor the specified email account and:
 2. Send the email content to OpenAI's API
 3. Send back the AI-generated response to the original sender
 
+Anthropic Integration
+-------------------
+
+This example shows how to create an email agent that processes incoming emails using Anthropic's Claude model
+and sends back AI-generated responses.
+
+.. literalinclude:: ../../examples/anthropic_completion.py
+   :language: python
+   :caption: Anthropic Email Agent Example
+   :name: anthropic_example
+   :linenos:
+
+To run this example:
+
+1. Install the required dependencies:
+
+   .. code-block:: bash
+
+      pip install pymailai[anthropic]
+
+2. Set up the required environment variables:
+
+   .. code-block:: bash
+
+      export ANTHROPIC_API_KEY="your-anthropic-api-key"
+      export EMAIL_ADDRESS="your-email@example.com"
+      export EMAIL_PASSWORD="your-email-password"
+      # Optional: Configure custom email servers
+      export EMAIL_IMAP_SERVER="imap.gmail.com"
+      export EMAIL_SMTP_SERVER="smtp.gmail.com"
+
+3. Run the example:
+
+   .. code-block:: bash
+
+      python examples/anthropic_completion.py
+
+The agent will monitor the specified email account and:
+
+1. Process any new incoming emails
+2. Send the email content to Anthropic's API
+3. Send back the AI-generated response to the original sender
+
 Simple AI Agent
 --------------
 
