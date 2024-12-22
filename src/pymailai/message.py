@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from email import utils
 from email.message import EmailMessage
 from typing import List, Optional, Dict, Any
 
@@ -54,8 +55,8 @@ class EmailData:
             cc_addresses=[addr.strip() for addr in (msg["Cc"] or "").split(",") if addr],
             body_text=body_text,
             body_html=body_html,
-            timestamp=datetime.fromtimestamp(email.utils.mktime_tz(
-                email.utils.parsedate_tz(msg["Date"])
+            timestamp=datetime.fromtimestamp(utils.mktime_tz(
+                utils.parsedate_tz(msg["Date"])
             )),
             references=[ref.strip() for ref in (msg["References"] or "").split()],
             in_reply_to=msg["In-Reply-To"],
@@ -75,15 +76,31 @@ class EmailData:
         if self.references:
             msg["References"] = " ".join(self.references)
 
-        # Handle multipart messages
-        if self.body_html or self.attachments:
-            msg.make_mixed()
+        # Handle message content
+        if self.body_html:
+            # Create multipart/alternative for HTML and text
+            msg.make_alternative()
             msg.add_alternative(self.body_text, subtype="plain")
-            if self.body_html:
-                msg.add_alternative(self.body_html, subtype="html")
+            msg.add_alternative(self.body_html, subtype="html")
             
-            # Add attachments
+            # If there are attachments, convert to multipart/mixed
             if self.attachments:
+                msg_alt = msg
+                msg = EmailMessage()
+                msg["Subject"] = self.subject
+                msg["From"] = self.from_address
+                msg["To"] = ", ".join(self.to_addresses)
+                if self.cc_addresses:
+                    msg["Cc"] = ", ".join(self.cc_addresses)
+                if self.in_reply_to:
+                    msg["In-Reply-To"] = self.in_reply_to
+                if self.references:
+                    msg["References"] = " ".join(self.references)
+                
+                msg.make_mixed()
+                msg.attach(msg_alt)
+                
+                # Add attachments
                 for attachment in self.attachments:
                     msg.add_attachment(
                         attachment["payload"],
@@ -92,7 +109,21 @@ class EmailData:
                         filename=attachment["filename"]
                     )
         else:
-            # Simple text-only message
-            msg.set_content(self.body_text)
+            # Text-only message
+            if self.attachments:
+                msg.make_mixed()
+                msg.add_alternative(self.body_text, subtype="plain")
+                
+                # Add attachments
+                for attachment in self.attachments:
+                    msg.add_attachment(
+                        attachment["payload"],
+                        maintype=attachment["content_type"].split("/")[0],
+                        subtype=attachment["content_type"].split("/")[1],
+                        filename=attachment["filename"]
+                    )
+            else:
+                # Simple text-only message without attachments
+                msg.set_content(self.body_text)
 
         return msg
