@@ -50,7 +50,7 @@ def test_load_invalid_json(tmp_path):
     invalid_file = tmp_path / "invalid.json"
     with open(invalid_file, 'w') as f:
         f.write("not valid json")
-    
+
     with pytest.raises(ValueError, match="Invalid JSON"):
         GmailCredentials(invalid_file)
 
@@ -63,7 +63,7 @@ def test_create_from_oauth_credentials(tmp_path):
         refresh_token="test-refresh-token",
         save_path=tmp_path / "new_creds.json"
     )
-    
+
     assert creds.client_id == "test-client-id"
     assert creds.client_secret == "test-client-secret"
     assert creds.refresh_token == "test-refresh-token"
@@ -79,18 +79,18 @@ def test_create_from_oauth_credentials_no_save():
         "token_uri": "https://oauth2.googleapis.com/token",
         "type": "authorized_user"
     }
-    
+
     with patch('builtins.open', mock_open(read_data=json.dumps(test_creds))) as mock_file:
         creds = GmailCredentials.from_oauth_credentials(
             client_id="test-client-id",
             client_secret="test-client-secret",
             refresh_token="test-refresh-token"
         )
-        
+
         assert creds.client_id == "test-client-id"
         assert creds.client_secret == "test-client-secret"
         assert creds.refresh_token == "test-refresh-token"
-        
+
         # Verify temp file was created and written to
         mock_file.assert_called()
         handle = mock_file()
@@ -102,7 +102,7 @@ def test_to_email_config(valid_creds_file):
     creds = GmailCredentials(valid_creds_file)
     email = "test@gmail.com"
     config = creds.to_email_config(email)
-    
+
     assert config.email == email
     assert config.password == creds.refresh_token
     assert config.imap_server == "imap.gmail.com"
@@ -116,11 +116,11 @@ def test_missing_required_fields(tmp_path):
         "client_id": "test-client-id",
         # Missing client_secret and refresh_token
     }
-    
+
     creds_file = tmp_path / "incomplete_creds.json"
     with open(creds_file, 'w') as f:
         json.dump(incomplete_creds, f)
-    
+
     creds = GmailCredentials(creds_file)
     assert creds.client_secret == ""  # Should return empty string for missing fields
     assert creds.refresh_token == ""
@@ -135,5 +135,5 @@ def test_custom_token_uri():
         refresh_token="test-refresh-token",
         token_uri=custom_uri
     )
-    
+
     assert creds.token_uri == custom_uri

@@ -121,7 +121,7 @@ To use Gmail with OAuth2 credentials:
       export GMAIL_CLIENT_SECRET="your-client-secret"
       export GMAIL_REFRESH_TOKEN="your-refresh-token"
       export GMAIL_ADDRESS="your-gmail@gmail.com"
-      
+
       # Run the example to save credentials
       python examples/gmail_credentials.py
 

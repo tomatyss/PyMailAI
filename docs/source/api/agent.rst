@@ -15,6 +15,6 @@ Type Definitions
    :type: Callable[[EmailData], Coroutine[Any, Any, Optional[EmailData]]]
 
    Type alias for message handler functions that process incoming emails.
-   
+
    The handler should be an async function that takes an :class:`EmailData` object
    and returns an optional response :class:`EmailData`.

@@ -15,15 +15,13 @@ MessageHandler = Callable[[EmailData], Coroutine[Any, Any, Optional[EmailData]]]
 
 
 class EmailAgent:
-    """AI-powered email agent that processes incoming emails and generates responses."""
+    """Process incoming emails and generate responses using AI."""
 
     def __init__(
-        self,
-        config: EmailConfig,
-        message_handler: Optional[MessageHandler] = None
+        self, config: EmailConfig, message_handler: Optional[MessageHandler] = None
     ):
         """Initialize the email agent.
-        
+
         Args:
             config: Email configuration settings
             message_handler: Optional async callback for custom message processing
@@ -36,13 +34,13 @@ class EmailAgent:
 
     async def process_message(self, message: EmailData) -> Optional[EmailData]:
         """Process an incoming email message.
-        
+
         This method can be overridden to implement custom processing logic.
         By default, it calls the message_handler if one was provided.
-        
+
         Args:
             message: The incoming email message to process
-            
+
         Returns:
             Optional response message to send
         """
@@ -51,30 +49,34 @@ class EmailAgent:
         return None
 
     async def _check_messages(self) -> None:
-        """Check for new messages and process them."""
+        """Poll for new messages and process them."""
+        if not self._client:
+            logger.error("Email client not initialized")
+            return
+
         try:
             async for message in self._client.fetch_new_messages():
                 try:
                     # Process the message
                     response = await self.process_message(message)
-                    
+
                     # Mark original message as read
                     await self._client.mark_as_read(message.message_id)
-                    
+
                     # Send response if one was generated
-                    if response:
+                    if response and self._client:
                         await self._client.send_message(response)
-                        
+
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
-                    
+
         except Exception as e:
             logger.error(f"Error fetching messages: {e}", exc_info=True)
 
     async def _run(self) -> None:
-        """Main run loop for the email agent."""
+        """Run loop for the email agent."""
         self._client = EmailClient(self.config)
-        
+
         try:
             async with self._client:
                 while self._running:

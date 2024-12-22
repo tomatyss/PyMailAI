@@ -19,7 +19,9 @@ extensions = [
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
+from typing import List
+
+exclude_patterns: List[str] = []
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'sphinx_rtd_theme'

@@ -2,6 +2,7 @@
 
 import email
 import logging
+from email.message import EmailMessage
 from typing import AsyncGenerator, Optional
 
 import aioimaplib
@@ -28,10 +29,14 @@ class EmailClient:
         self._imap = aioimaplib.IMAP4_SSL(
             host=self.config.imap_server,
             port=self.config.imap_port,
-            timeout=self.config.timeout
+            timeout=self.config.timeout,
         )
         await self._imap.wait_hello_from_server()
-        logger.debug("Connected to IMAP server %s:%s", self.config.imap_server, self.config.imap_port)
+        logger.debug(
+            "Connected to IMAP server %s:%s",
+            self.config.imap_server,
+            self.config.imap_port,
+        )
         await self._imap.login(self.config.email, self.config.password)
         logger.debug("Logged in to IMAP server as %s", self.config.email)
         await self._imap.select(self.config.folder)
@@ -44,21 +49,29 @@ class EmailClient:
                 hostname=self.config.smtp_server,
                 port=self.config.smtp_port,
                 timeout=self.config.timeout,
-                use_tls=True  # Immediate TLS for port 465
+                use_tls=True,  # Immediate TLS for port 465
             )
             await self._smtp.connect()
-            logger.debug("Connected to SMTP server %s:%s with SSL/TLS", self.config.smtp_server, self.config.smtp_port)
+            logger.debug(
+                "Connected to SMTP server %s:%s with SSL/TLS",
+                self.config.smtp_server,
+                self.config.smtp_port,
+            )
         else:
             # Ports 25 and 587 start unencrypted
             self._smtp = aiosmtplib.SMTP(
                 hostname=self.config.smtp_server,
                 port=self.config.smtp_port,
                 timeout=self.config.timeout,
-                use_tls=False
+                use_tls=False,
             )
             await self._smtp.connect()
-            logger.debug("Connected to SMTP server %s:%s", self.config.smtp_server, self.config.smtp_port)
-            
+            logger.debug(
+                "Connected to SMTP server %s:%s",
+                self.config.smtp_server,
+                self.config.smtp_port,
+            )
+
             # Use STARTTLS if available (standard for port 587)
             if self.config.tls:
                 try:
@@ -99,22 +112,33 @@ class EmailClient:
             if not msg_data or not msg_data[0]:
                 logger.warning("No data returned for message %s", num)
                 continue
-                
-            # IMAP fetch response is a list of tuples: [(b'1 (RFC822 {size}', b'raw email data'), b')']
+
+            # IMAP fetch response format:
+            # [(b'1 (RFC822 {size}', b'raw email data'), b')']
             # We need to ensure we're getting the actual email data
             email_data = msg_data[0]
             if isinstance(email_data, (list, tuple)) and len(email_data) > 1:
                 email_body = email_data[1]
             else:
-                logger.warning("Unexpected message data format for message %s: %s", num, email_data)
+                logger.warning(
+                    "Unexpected message data format for message %s: %s", num, email_data
+                )
                 continue
-                
+
             if not isinstance(email_body, bytes):
-                logger.warning("Email body is not bytes for message %s: %s", num, type(email_body))
+                logger.warning(
+                    "Email body is not bytes for message %s: %s", num, type(email_body)
+                )
                 continue
-                
-            email_message = email.message_from_bytes(email_body, policy=email.policy.default)
-            
+
+            # Create EmailMessage instead of Message
+            email_message = email.message_from_bytes(
+                email_body, policy=email.policy.default
+            )
+            if not isinstance(email_message, EmailMessage):
+                email_message = EmailMessage()
+                email_message.set_content(email_body.decode())
+
             # Convert to our EmailData format
             email_data = EmailData.from_email_message(email_message)
             yield email_data

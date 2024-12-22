@@ -26,7 +26,7 @@ async def echo_handler(message: EmailData) -> EmailData:
 async def main():
     # Load Gmail credentials from file
     creds_path = Path.home() / ".config" / "pymailai" / "gmail_creds.json"
-    
+
     # If credentials file doesn't exist, create it from environment variables
     if not creds_path.exists():
         creds_path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,17 +38,17 @@ async def main():
         )
     else:
         creds = GmailCredentials(creds_path)
-    
+
     # Convert to EmailConfig
     email_address = os.getenv("GMAIL_ADDRESS", "")
     config = creds.to_email_config(email_address)
-    
+
     # Create and run email agent
     async with EmailAgent(config, message_handler=echo_handler) as agent:
         print(f"Gmail Agent started. Monitoring {config.email}")
         print("Send an email to get an echo response!")
         print("Press Ctrl+C to stop...")
-        
+
         try:
             while True:
                 await asyncio.sleep(1)

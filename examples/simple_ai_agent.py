@@ -10,7 +10,7 @@ from pymailai.message import EmailData
 
 async def ai_message_handler(message: EmailData) -> Optional[EmailData]:
     """Simple AI message handler that echoes back the received message.
-    
+
     In a real application, this would integrate with an AI model to:
     1. Process the incoming message content
     2. Generate an appropriate response
@@ -27,10 +27,10 @@ async def ai_message_handler(message: EmailData) -> Optional[EmailData]:
         body_html=None,
         timestamp=message.timestamp,
         in_reply_to=message.message_id,
-        references=[message.message_id] if message.references is None 
+        references=[message.message_id] if message.references is None
                   else message.references + [message.message_id]
     )
-    
+
     return response
 
 
@@ -43,15 +43,15 @@ async def main():
         email=os.getenv("EMAIL_ADDRESS"),
         password=os.getenv("EMAIL_PASSWORD")
     )
-    
+
     # Validate configuration
     config.validate()
-    
+
     # Create and run the email agent
     async with EmailAgent(config, message_handler=ai_message_handler) as agent:
         print(f"Email agent started. Monitoring {config.email}")
         print("Press Ctrl+C to stop...")
-        
+
         try:
             # Keep the agent running
             while True:

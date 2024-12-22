@@ -104,7 +104,7 @@ def test_email_data_multipart():
     msg["To"] = "recipient@example.com"
     msg["Message-ID"] = "<123@example.com>"
     msg["Date"] = "Thu, 1 Jan 2023 12:00:00 +0000"
-    
+
     # Add plain text and HTML content
     msg.make_alternative()  # First make alternative part
     msg.add_alternative("Plain text content", subtype="plain")

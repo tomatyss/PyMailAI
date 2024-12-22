@@ -28,7 +28,7 @@ Example Usage
 .. code-block:: python
 
     from pymailai import EmailConfig
-    
+
     config = EmailConfig(
         imap_server="imap.gmail.com",
         smtp_server="smtp.gmail.com",
@@ -36,6 +36,6 @@ Example Usage
         password="your-app-password",
         check_interval=30  # Check every 30 seconds
     )
-    
+
     # Validate the configuration
     config.validate()

@@ -1,10 +1,11 @@
 # PyMailAI Makefile
 
-.PHONY: help install test test-cov format lint type-check clean
+.PHONY: help install install-hooks test test-cov format lint type-check clean
 
 help:
 	@echo "Available commands:"
 	@echo "  make install      Install development dependencies"
+	@echo "  make install-hooks Install pre-commit hooks"
 	@echo "  make test        Run tests"
 	@echo "  make test-cov    Run tests with coverage report"
 	@echo "  make format      Format code with black and isort"
@@ -14,6 +15,10 @@ help:
 
 install:
 	pip install -e ".[dev]"
+	pre-commit install
+
+install-hooks:
+	pre-commit install
 
 test:
 	pytest tests/ -v
