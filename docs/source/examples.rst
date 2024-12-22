@@ -89,6 +89,45 @@ The agent will monitor the specified email account and:
 2. Send the email content to Anthropic's API
 3. Send back the AI-generated response to the original sender
 
+Gmail Credentials
+---------------
+
+This example shows how to use Gmail credentials from a file instead of environment variables.
+This is particularly useful for applications that need to manage multiple Gmail accounts or
+want to securely store OAuth2 credentials.
+
+.. literalinclude:: ../../examples/gmail_credentials.py
+   :language: python
+   :caption: Gmail Credentials Example
+   :name: gmail_example
+   :linenos:
+
+To use Gmail with OAuth2 credentials:
+
+1. Set up a Google Cloud Project and enable the Gmail API:
+
+   a. Go to the `Google Cloud Console <https://console.cloud.google.com/>`_
+   b. Create a new project or select an existing one
+   c. Enable the Gmail API
+   d. Create OAuth2 credentials (Desktop application type)
+   e. Download the credentials
+
+2. Get a refresh token:
+
+   .. code-block:: bash
+
+      # First time setup - this will create the credentials file
+      export GMAIL_CLIENT_ID="your-client-id"
+      export GMAIL_CLIENT_SECRET="your-client-secret"
+      export GMAIL_REFRESH_TOKEN="your-refresh-token"
+      export GMAIL_ADDRESS="your-gmail@gmail.com"
+      
+      # Run the example to save credentials
+      python examples/gmail_credentials.py
+
+The credentials will be saved to ``~/.config/pymailai/gmail_creds.json``. Future runs will load
+the credentials from this file automatically.
+
 Simple AI Agent
 --------------
 
