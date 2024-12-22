@@ -1,5 +1,7 @@
 # PyMailAI
 
+[![Documentation Status](https://github.com/tomatyss/pymailai/actions/workflows/docs.yml/badge.svg)](https://tomatyss.github.io/pymailai/)
+
 PyMailAI is a Python package that enables AI agents to use email as an input/output interface. It provides simple wrappers to:
 1. Get prompts from incoming emails
 2. Process them with your LLM of choice
@@ -160,12 +162,34 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 # ... other API keys as needed
 ```
 
+## Documentation
+
+Full documentation is available at [https://tomatyss.github.io/pymailai/](https://tomatyss.github.io/pymailai/)
+
 ## More Examples
 
 Check the `examples/` directory for more examples:
 - `openai_completion.py`: Basic OpenAI integration
 - `anthropic_computer_agent.py`: Anthropic computer-use agent
 - `simple_ai_agent.py`: Template for custom agents
+
+## Contributing
+
+### Building Documentation
+
+To build the documentation locally:
+
+```bash
+# Install Sphinx and theme
+pip install sphinx sphinx-rtd-theme
+
+# Build the docs
+cd docs
+make html
+
+# View the docs (macOS)
+open build/html/index.html
+```
 
 ## License
 
