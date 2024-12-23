@@ -1,6 +1,6 @@
 [project]
 name = "pymailai"
-version = "0.1.0"
+version = "0.1.1"
 description = "Email interface for AI agents"
 license = "MIT"
 authors = [
