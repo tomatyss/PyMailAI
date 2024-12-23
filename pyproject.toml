@@ -2,6 +2,7 @@
 name = "pymailai"
 version = "0.1.0"
 description = "Email interface for AI agents"
+license = "MIT"
 authors = [
     { name = "Ivan Iufriakov" }
 ]
