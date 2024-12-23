@@ -72,16 +72,9 @@ class EmailClient:
                 self.config.smtp_port,
             )
 
-            # Use STARTTLS if available (standard for port 587)
-            if self.config.tls:
-                try:
-                    await self._smtp.starttls()
-                except Exception as e:
-                    if self.config.smtp_port == 587:
-                        # STARTTLS is required for port 587
-                        raise
-                    # For other ports like 25, continue without TLS if it fails
-                    logger.warning("STARTTLS failed: %s", e)
+            # Use STARTTLS for port 587
+            if self.config.smtp_port == 587:
+                await self._smtp.starttls()
         await self._smtp.login(self.config.email, self.config.password)
         logger.debug("Logged in to SMTP server as %s", self.config.email)
 
@@ -124,37 +117,8 @@ class EmailClient:
                 logger.error(f"Failed to fetch message {num}: {str(e)}")
                 continue
 
-            # IMAP fetch response can vary between servers
-            # Some return: [(b'1 (RFC822 {size}', b'raw email data'), b')']
-            # Others return: [b'28 FETCH (FLAGS (\\Seen) RFC822 {5324}', b'raw email data', b')']
-            logger.debug("Raw IMAP response for message %s: %s", num, msg_data)
-
-            # Get the email body from the message data
-            if isinstance(msg_data[0], tuple):
-                # Handle case where message data is a tuple containing (message_id, content)
-                email_body = msg_data[0][1]
-            else:
-                # Try to find the email content in the message data
-                email_body = None
-                for part in msg_data:
-                    if (
-                        isinstance(part, bytes)
-                        and not part.startswith(b"FETCH")
-                        and not part.endswith(b")")
-                    ):
-                        email_body = part
-                        break
-                    elif isinstance(part, (list, tuple)):
-                        for item in part:
-                            if (
-                                isinstance(item, bytes)
-                                and not item.startswith(b"FETCH")
-                                and not item.endswith(b")")
-                            ):
-                                email_body = item
-                                break
-                        if email_body:
-                            break
+            # When using RFC822, the email data is always the second element in the response
+            email_body = msg_data[1]
 
             if not email_body:
                 logger.warning(

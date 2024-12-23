@@ -22,7 +22,7 @@ async def process_with_openai(message: EmailData) -> Optional[EmailData]:
     """
     try:
         # Get completion from OpenAI
-        completion = await client.chat.completions.create(
+        completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
@@ -58,7 +58,8 @@ async def main():
         imap_server=os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com"),
         smtp_server=os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com"),
         email=os.getenv("EMAIL_ADDRESS"),
-        password=os.getenv("EMAIL_PASSWORD")
+        password=os.getenv("EMAIL_PASSWORD"),
+        smtp_port=465  # Use implicit SSL/TLS port
     )
 
     # Create and run email agent

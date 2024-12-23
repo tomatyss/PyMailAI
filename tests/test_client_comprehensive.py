@@ -1,6 +1,5 @@
 """Comprehensive tests for EmailClient class."""
 
-import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -100,6 +99,8 @@ async def test_connect_smtp_ssl(email_config):
 @pytest.mark.asyncio
 async def test_connect_smtp_no_tls(email_config):
     """Test connecting to SMTP without TLS."""
+    # Use port 25 since port 587 always requires TLS
+    email_config.smtp_port = 25
     email_config.tls = False
     client = EmailClient(email_config)
 
@@ -111,21 +112,22 @@ async def test_connect_smtp_no_tls(email_config):
             patch('aiosmtplib.SMTP', return_value=mock_smtp):
         await client.connect()
 
-        # Verify TLS was not used
+        # Verify TLS was not used with port 25
         assert not mock_smtp.starttls.called
 
 
 @pytest.mark.asyncio
-async def test_fetch_new_messages(email_config):
-    """Test fetching new messages."""
+async def test_fetch_new_messages_simple_format(email_config):
+    """Test fetching new messages with simple IMAP response format."""
     client = EmailClient(email_config)
     client._imap = AsyncMock()
 
-    # Mock IMAP search and fetch responses
+    # Mock IMAP search and fetch responses - exact format from production
     message_data = [
-        (b'1 (RFC822 {100}',
-         b'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test\r\n\r\nTest body',
-         b')')
+        b'1 FETCH (FLAGS (\\Seen) RFC822 {100}',
+        bytearray(b'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test\r\n\r\nTest body'),
+        b')',
+        b'Fetch completed (0.001 + 0.000 secs).'
     ]
     client._imap.search.return_value = (None, [b'1'])
     client._imap.fetch.return_value = (None, message_data)
@@ -136,7 +138,9 @@ async def test_fetch_new_messages(email_config):
 
     assert len(messages) == 1
     assert isinstance(messages[0], EmailData)
+    assert messages[0].body_text.strip() == "Test body"
     client._imap.search.assert_called_once_with('UNSEEN')
+
 
 
 @pytest.mark.asyncio
@@ -145,26 +149,29 @@ async def test_fetch_messages_with_attachments(email_config):
     client = EmailClient(email_config)
     client._imap = AsyncMock()
 
-    # Mock message with attachment
-    message_data = [(
-        b'1 (RFC822 {500}',
-        b'From: sender@example.com\r\n'
-        b'To: recipient@example.com\r\n'
-        b'Subject: Test with attachment\r\n'
-        b'Content-Type: multipart/mixed; boundary="boundary"\r\n'
-        b'MIME-Version: 1.0\r\n'
-        b'Message-ID: <test123@example.com>\r\n\r\n'
-        b'--boundary\r\n'
-        b'Content-Type: text/plain\r\n\r\n'
-        b'Test body\r\n'
-        b'--boundary\r\n'
-        b'Content-Type: text/plain; name="test.txt"\r\n'
-        b'Content-Disposition: attachment; filename="test.txt"\r\n'
-        b'Content-Transfer-Encoding: base64\r\n\r\n'
-        b'QXR0YWNobWVudCBjb250ZW50\r\n'  # base64 encoded "Attachment content"
-        b'--boundary--\r\n'
-        b')'
-    )]
+    # Mock message with attachment - exact format from production
+    message_data = [
+        b'1 FETCH (FLAGS (\\Seen) RFC822 {500}',
+        bytearray(
+            b'From: sender@example.com\r\n'
+            b'To: recipient@example.com\r\n'
+            b'Subject: Test with attachment\r\n'
+            b'Content-Type: multipart/mixed; boundary="boundary"\r\n'
+            b'MIME-Version: 1.0\r\n'
+            b'Message-ID: <test123@example.com>\r\n\r\n'
+            b'--boundary\r\n'
+            b'Content-Type: text/plain\r\n\r\n'
+            b'Test body\r\n'
+            b'--boundary\r\n'
+            b'Content-Type: text/plain; name="test.txt"\r\n'
+            b'Content-Disposition: attachment; filename="test.txt"\r\n'
+            b'Content-Transfer-Encoding: base64\r\n\r\n'
+            b'QXR0YWNobWVudCBjb250ZW50\r\n'  # base64 encoded "Attachment content"
+            b'--boundary--\r\n'
+        ),
+        b')',
+        b'Fetch completed (0.001 + 0.000 secs).'
+    ]
     client._imap.search.return_value = (None, [b'1'])
     client._imap.fetch.return_value = (None, message_data)
 

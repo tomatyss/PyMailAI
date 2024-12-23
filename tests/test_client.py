@@ -123,11 +123,12 @@ async def test_fetch_new_messages(email_config):
     client = EmailClient(email_config)
     client._imap = AsyncMock()
 
-    # Mock IMAP search and fetch responses
+    # Mock IMAP search and fetch responses - exact format from production
     message_data = [
-        (b'1 (RFC822 {100}',
-         b'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test\r\n\r\nTest body',
-         b')')
+        b'1 FETCH (FLAGS (\\Seen) RFC822 {100}',
+        bytearray(b'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test\r\n\r\nTest body'),
+        b')',
+        b'Fetch completed (0.001 + 0.000 secs).'
     ]
     client._imap.search.return_value = (None, [b'1 2 3'])
     client._imap.fetch.return_value = (None, message_data)
