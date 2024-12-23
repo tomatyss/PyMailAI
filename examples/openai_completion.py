@@ -4,12 +4,13 @@ import asyncio
 import os
 from typing import Optional
 
-import openai
+from openai import OpenAI
 from pymailai import EmailAgent, EmailConfig
 from pymailai.message import EmailData
 
 # Configure OpenAI
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 async def process_with_openai(message: EmailData) -> Optional[EmailData]:
     """Process email content using OpenAI's completion API.
@@ -21,9 +22,10 @@ async def process_with_openai(message: EmailData) -> Optional[EmailData]:
     """
     try:
         # Get completion from OpenAI
-        completion = await openai.ChatCompletion.acreate(
-            model="gpt-3.5-turbo",
+        completion = await client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": message.body_text}
             ]
         )
@@ -43,11 +45,12 @@ async def process_with_openai(message: EmailData) -> Optional[EmailData]:
             timestamp=message.timestamp,
             in_reply_to=message.message_id,
             references=[message.message_id] if message.references is None
-                      else message.references + [message.message_id]
+            else message.references + [message.message_id]
         )
     except Exception as e:
         print(f"Error processing message: {e}")
         return None
+
 
 async def main():
     # Configure email settings

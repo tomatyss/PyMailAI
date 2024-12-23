@@ -2,7 +2,9 @@
 name = "pymailai"
 version = "0.1.0"
 description = "Email interface for AI agents"
-authors = ["Ivan Iufriakov"]
+authors = [
+    { name = "Ivan Iufriakov" }
+]
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
