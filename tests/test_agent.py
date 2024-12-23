@@ -174,9 +174,17 @@ async def test_check_messages_error_handling(email_config):
     """Test error handling during message checking."""
     agent = EmailAgent(email_config)
 
-    # Mock client that raises an exception
+    # Mock client with an async iterator that raises an exception
     mock_client = AsyncMock()
-    mock_client.fetch_new_messages.side_effect = Exception("Test error")
+
+    class ErrorIterator:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise Exception("Test error")
+
+    mock_client.fetch_new_messages = lambda: ErrorIterator()
     agent._client = mock_client
 
     # Should not raise exception

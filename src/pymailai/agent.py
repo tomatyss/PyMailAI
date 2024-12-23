@@ -55,13 +55,8 @@ class EmailAgent:
             return
 
         try:
-            # Create a list to store the messages
-            messages = []
+            # Process messages as they come in
             async for message in self._client.fetch_new_messages():
-                messages.append(message)
-
-            # Process each message
-            for message in messages:
                 try:
                     # Process the message
                     response = await self.process_message(message)
