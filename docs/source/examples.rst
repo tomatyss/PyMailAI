@@ -168,6 +168,58 @@ Example log output at DEBUG level:
    2023-07-20 10:15:30,789 - pymailai.gmail - DEBUG - Refreshing OAuth2 token
    2023-07-20 10:15:31,012 - pymailai.client - INFO - Successfully authenticated with OAuth2
 
+Ollama Integration
+----------------
+
+This example shows how to create an email agent that processes incoming emails using Ollama's local LLM models
+and sends back AI-generated responses.
+
+.. literalinclude:: ../../examples/ollama_completion.py
+   :language: python
+   :caption: Ollama Email Agent Example
+   :name: ollama_example
+   :linenos:
+
+To run this example:
+
+1. Install the required dependencies:
+
+   .. code-block:: bash
+
+      pip install pymailai[ollama]
+
+2. Install and start Ollama:
+
+   Follow the instructions at https://ollama.ai to install Ollama for your platform.
+   Then pull your desired model:
+
+   .. code-block:: bash
+
+      ollama pull llama3.2  # Latest Llama version
+
+3. Set up the required environment variables:
+
+   .. code-block:: bash
+
+      export EMAIL_ADDRESS="your-email@example.com"
+      export EMAIL_PASSWORD="your-email-password"
+      export EMAIL_IMAP_SERVER="your-imap-server"
+      export EMAIL_SMTP_SERVER="your-smtp-server"
+      export EMAIL_IMAP_PORT="993"  # Default SSL/TLS port for IMAP
+      export EMAIL_SMTP_PORT="465"  # Default SSL/TLS port for SMTP
+
+4. Run the example:
+
+   .. code-block:: bash
+
+      python examples/ollama_completion.py
+
+The agent will monitor the specified email account and:
+
+1. Process any new incoming emails
+2. Send the email content to the local Ollama instance
+3. Send back the AI-generated response to the original sender
+
 Simple AI Agent
 --------------
 

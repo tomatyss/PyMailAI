@@ -194,6 +194,41 @@ Anthropic Example
            references=[message.message_id]
        )
 
+Ollama Example
+~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   pip install pymailai[ollama]
+
+.. code-block:: python
+
+   from ollama import chat, ChatResponse
+   from pymailai import EmailAgent, EmailConfig
+   from pymailai.message import EmailData
+
+   async def process_with_ollama(message: EmailData) -> Optional[EmailData]:
+       response: ChatResponse = chat(
+           model="llama3.2",  # Latest Llama version
+           messages=[
+               {"role": "system", "content": "You are a helpful assistant."},
+               {"role": "user", "content": message.body_text}
+           ]
+       )
+
+       return EmailData(
+           message_id="",
+           subject=f"Re: {message.subject}",
+           from_address=message.to_addresses[0],
+           to_addresses=[message.from_address],
+           cc_addresses=[],
+           body_text=response.message.content,
+           body_html=None,
+           timestamp=message.timestamp,
+           in_reply_to=message.message_id,
+           references=[message.message_id]
+       )
+
 Next Steps
 ---------
 
