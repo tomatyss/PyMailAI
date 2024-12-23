@@ -7,4 +7,6 @@ This section provides detailed API documentation for pymailai's components.
    :maxdepth: 2
 
    agent
+   client
    config
+   message

@@ -89,12 +89,12 @@ The agent will monitor the specified email account and:
 2. Send the email content to Anthropic's API
 3. Send back the AI-generated response to the original sender
 
-Gmail Credentials
----------------
+Gmail OAuth2 Integration
+----------------------
 
-This example shows how to use Gmail credentials from a file instead of environment variables.
-This is particularly useful for applications that need to manage multiple Gmail accounts or
-want to securely store OAuth2 credentials.
+This example shows how to use Gmail OAuth2 authentication instead of password-based authentication.
+This is the recommended approach for Gmail accounts as it provides better security and avoids
+issues with 2-factor authentication and app-specific passwords.
 
 .. literalinclude:: ../../examples/gmail_credentials.py
    :language: python
@@ -109,10 +109,15 @@ To use Gmail with OAuth2 credentials:
    a. Go to the `Google Cloud Console <https://console.cloud.google.com/>`_
    b. Create a new project or select an existing one
    c. Enable the Gmail API
-   d. Create OAuth2 credentials (Desktop application type)
-   e. Download the credentials
+   d. Create OAuth2 credentials:
+      - Click "Create Credentials" and select "OAuth client ID"
+      - Choose "Desktop application" as the application type
+      - Download the credentials JSON file
+   e. Configure the OAuth consent screen:
+      - Add your email address as a test user
+      - Set the necessary scopes (gmail.modify, gmail.compose, gmail.send)
 
-2. Get a refresh token:
+2. Get a refresh token using the provided helper script:
 
    .. code-block:: bash
 
@@ -127,6 +132,41 @@ To use Gmail with OAuth2 credentials:
 
 The credentials will be saved to ``~/.config/pymailai/gmail_creds.json``. Future runs will load
 the credentials from this file automatically.
+
+Logging Configuration
+------------------
+
+pymailai includes comprehensive logging for debugging and monitoring. You can configure the logging
+level and output format:
+
+.. code-block:: python
+
+   import logging
+
+   # Configure logging for the entire package
+   logging.basicConfig(
+       level=logging.INFO,  # or logging.DEBUG for more detailed output
+       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+   )
+
+   # Or configure logging for specific components
+   logger = logging.getLogger('pymailai.client')
+   logger.setLevel(logging.DEBUG)
+
+The following components have dedicated loggers:
+
+- pymailai.client: Email client operations (SMTP/IMAP connections, message operations)
+- pymailai.agent: AI agent activities (message processing, AI interactions)
+- pymailai.gmail: Gmail-specific operations (OAuth2, credential management)
+
+Example log output at DEBUG level:
+
+.. code-block:: text
+
+   2023-07-20 10:15:30,123 - pymailai.client - DEBUG - Connecting to SMTP server smtp.gmail.com:587
+   2023-07-20 10:15:30,456 - pymailai.client - INFO - Successfully connected to SMTP server
+   2023-07-20 10:15:30,789 - pymailai.gmail - DEBUG - Refreshing OAuth2 token
+   2023-07-20 10:15:31,012 - pymailai.client - INFO - Successfully authenticated with OAuth2
 
 Simple AI Agent
 --------------
