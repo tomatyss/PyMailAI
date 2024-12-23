@@ -1,0 +1,230 @@
+"""Tests for the EmailClient class."""
+
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from pymailai.client import EmailClient
+from pymailai.config import EmailConfig
+from pymailai.message import EmailData
+
+
+@pytest.fixture
+def email_config():
+    """Create a test email configuration."""
+    return EmailConfig(
+        email="test@example.com",
+        password="password",
+        imap_server="imap.example.com",
+        smtp_server="smtp.example.com",
+        folder="INBOX",
+        check_interval=60,
+    )
+
+
+@pytest.fixture
+def test_message():
+    """Create a test email message."""
+    return EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Test message",
+        body_html=None,
+        timestamp=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_client_initialization(email_config):
+    """Test EmailClient initialization."""
+    client = EmailClient(email_config)
+    assert client.config == email_config
+    assert client._imap is None
+    assert client._smtp is None
+
+
+@pytest.mark.asyncio
+async def test_connect_imap_smtp(email_config):
+    """Test connecting to IMAP and SMTP servers."""
+    client = EmailClient(email_config)
+
+    # Mock IMAP
+    mock_imap = AsyncMock()
+    mock_imap.wait_hello_from_server = AsyncMock()
+    mock_imap.login = AsyncMock()
+    mock_imap.select = AsyncMock()
+
+    # Mock SMTP
+    mock_smtp = AsyncMock()
+    mock_smtp.connect = AsyncMock()
+    mock_smtp.starttls = AsyncMock()
+    mock_smtp.login = AsyncMock()
+
+    with patch('aioimaplib.IMAP4_SSL', return_value=mock_imap), \
+         patch('aiosmtplib.SMTP', return_value=mock_smtp):
+        await client.connect()
+
+        # Verify IMAP connection
+        mock_imap.wait_hello_from_server.assert_called_once()
+        mock_imap.login.assert_called_once_with(email_config.email, email_config.password)
+        mock_imap.select.assert_called_once_with(email_config.folder)
+
+        # Verify SMTP connection
+        mock_smtp.connect.assert_called_once()
+        mock_smtp.starttls.assert_called_once()
+        mock_smtp.login.assert_called_once_with(email_config.email, email_config.password)
+
+
+@pytest.mark.asyncio
+async def test_connect_smtp_ssl(email_config):
+    """Test connecting to SMTP with SSL (port 465)."""
+    email_config.smtp_port = 465
+    client = EmailClient(email_config)
+
+    mock_smtp = AsyncMock()
+    mock_smtp.connect = AsyncMock()
+    mock_smtp.login = AsyncMock()
+
+    with patch('aioimaplib.IMAP4_SSL', return_value=AsyncMock()), \
+         patch('aiosmtplib.SMTP', return_value=mock_smtp):
+        await client.connect()
+
+        # Verify SSL was used
+        assert not mock_smtp.starttls.called
+
+
+@pytest.mark.asyncio
+async def test_disconnect(email_config):
+    """Test disconnecting from email servers."""
+    client = EmailClient(email_config)
+
+    # Set up mocks
+    mock_imap = AsyncMock()
+    mock_smtp = AsyncMock()
+    client._imap = mock_imap
+    client._smtp = mock_smtp
+
+    await client.disconnect()
+
+    # Verify disconnection
+    mock_imap.logout.assert_called_once()
+    mock_smtp.quit.assert_called_once()
+    assert client._imap is None
+    assert client._smtp is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_new_messages(email_config):
+    """Test fetching new messages."""
+    client = EmailClient(email_config)
+    client._imap = AsyncMock()
+
+    # Mock IMAP search and fetch responses
+    message_data = [
+        (b'1 (RFC822 {100}',
+         b'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test\r\n\r\nTest body',
+         b')')
+    ]
+    client._imap.search.return_value = (None, [b'1 2 3'])
+    client._imap.fetch.return_value = (None, message_data)
+
+    messages = []
+    async for msg in client.fetch_new_messages():
+        messages.append(msg)
+
+    assert len(messages) > 0
+    assert isinstance(messages[0], EmailData)
+    client._imap.search.assert_called_once_with('UNSEEN')
+
+
+@pytest.mark.asyncio
+async def test_send_message(email_config, test_message):
+    """Test sending a message."""
+    client = EmailClient(email_config)
+    client._smtp = AsyncMock()
+
+    await client.send_message(test_message)
+
+    client._smtp.send_message.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_mark_as_read(email_config):
+    """Test marking a message as read."""
+    client = EmailClient(email_config)
+    client._imap = AsyncMock()
+
+    message_id = "<test123@example.com>"
+    client._imap.search.return_value = (None, [b'1'])
+
+    await client.mark_as_read(message_id)
+
+    client._imap.search.assert_called_once_with(f'HEADER "Message-ID" "{message_id}"')
+    client._imap.store.assert_called_once_with('1', '+FLAGS', '\\Seen')
+
+
+@pytest.mark.asyncio
+async def test_context_manager(email_config):
+    """Test async context manager functionality."""
+    client = EmailClient(email_config)
+
+    # Mock connect and disconnect
+    mock_connect = AsyncMock()
+    mock_disconnect = AsyncMock()
+    client.connect = mock_connect
+    client.disconnect = mock_disconnect
+
+    async with client:
+        mock_connect.assert_called_once()
+    mock_disconnect.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_fetch_messages_error_handling(email_config):
+    """Test error handling during message fetching."""
+    client = EmailClient(email_config)
+    client._imap = AsyncMock()
+
+    # Mock IMAP error
+    client._imap.fetch.side_effect = Exception("Fetch error")
+    client._imap.search.return_value = (None, [b'1'])
+
+    messages = []
+    async for msg in client.fetch_new_messages():
+        messages.append(msg)
+
+    assert len(messages) == 0
+
+
+@pytest.mark.asyncio
+async def test_mark_as_read_error_handling(email_config):
+    """Test error handling when marking messages as read."""
+    client = EmailClient(email_config)
+    client._imap = AsyncMock()
+
+    # Mock IMAP error
+    client._imap.store.side_effect = Exception("Store error")
+    client._imap.search.return_value = (None, [b'1'])
+
+    # Should not raise exception
+    await client.mark_as_read("<test123@example.com>")
+
+
+@pytest.mark.asyncio
+async def test_smtp_starttls_error_handling(email_config):
+    """Test SMTP STARTTLS error handling."""
+    client = EmailClient(email_config)
+
+    mock_smtp = AsyncMock()
+    mock_smtp.connect = AsyncMock()
+    mock_smtp.starttls = AsyncMock(side_effect=Exception("STARTTLS failed"))
+    mock_smtp.login = AsyncMock()
+
+    with patch('aioimaplib.IMAP4_SSL', return_value=AsyncMock()), \
+         patch('aiosmtplib.SMTP', return_value=mock_smtp), \
+         pytest.raises(Exception):  # Should raise for port 587
+        await client.connect()

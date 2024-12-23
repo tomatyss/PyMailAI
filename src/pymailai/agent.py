@@ -55,7 +55,13 @@ class EmailAgent:
             return
 
         try:
+            # Create a list to store the messages
+            messages = []
             async for message in self._client.fetch_new_messages():
+                messages.append(message)
+
+            # Process each message
+            for message in messages:
                 try:
                     # Process the message
                     response = await self.process_message(message)
@@ -69,6 +75,9 @@ class EmailAgent:
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
+                    # Still mark as read to avoid reprocessing
+                    if self._client:
+                        await self._client.mark_as_read(message.message_id)
 
         except Exception as e:
             logger.error(f"Error fetching messages: {e}", exc_info=True)
@@ -101,7 +110,10 @@ class EmailAgent:
 
         self._running = False
         if self._task:
-            await self._task
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass  # Task was cancelled, which is expected
             self._task = None
         logger.info("Email agent stopped")
 

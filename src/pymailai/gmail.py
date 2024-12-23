@@ -1,124 +1,166 @@
 """Gmail credential handling for PyMailAI."""
 
 import json
-import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TypedDict, Union
+from typing import List, Optional, Union
+
+from google.oauth2.credentials import Credentials
 
 from .config import EmailConfig
 
 
-class GmailCredentialsDict(TypedDict):
-    """Type definition for Gmail credentials dictionary."""
+class InvalidCredentialsError(Exception):
+    """Raised when credentials are invalid or missing required fields."""
+
+    pass
+
+
+@dataclass
+class GmailCredentials:
+    """Gmail OAuth2 credentials."""
 
     client_id: str
     client_secret: str
     refresh_token: str
-    token_uri: str
-    type: str
+    token_uri: str = "https://oauth2.googleapis.com/token"
+    scopes: Optional[List[str]] = None
+    email: Optional[str] = None
 
+    def __post_init__(self):
+        """Validate credentials after initialization."""
+        if not self.client_id or not self.client_secret or not self.refresh_token:
+            raise InvalidCredentialsError("Missing required credential fields")
 
-class GmailCredentials:
-    """Handler for Gmail credentials loaded from files."""
+        if self.scopes is None:
+            self.scopes = ["https://www.googleapis.com/auth/gmail.modify"]
 
-    def __init__(self, credentials_path: Union[str, Path]):
-        """Initialize Gmail credentials handler.
-
-        Args:
-            credentials_path: Path to the credentials JSON file
-        """
-        self.credentials_path = Path(credentials_path)
-        if not self.credentials_path.exists():
-            raise FileNotFoundError(f"Credentials file not found: {credentials_path}")
-
-        self._credentials: GmailCredentialsDict = self._load_credentials()
-
-    def _load_credentials(self) -> GmailCredentialsDict:
-        """Load credentials from JSON file."""
+    def to_oauth_credentials(self) -> Credentials:
+        """Convert to Google OAuth2 credentials."""
         try:
-            with open(self.credentials_path) as f:
-                creds: GmailCredentialsDict = json.load(f)
-                return creds
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in credentials file: {e}")
+            # Create OAuth credentials
+            from google.oauth2.credentials import Credentials
 
-    @classmethod
-    def from_oauth_credentials(
-        cls,
-        client_id: str,
-        client_secret: str,
-        refresh_token: str,
-        token_uri: str = "https://oauth2.googleapis.com/token",
-        save_path: Optional[Union[str, Path]] = None,
-    ) -> "GmailCredentials":
-        """Create credentials from OAuth2 details.
+            return Credentials(
+                None,  # token - will be refreshed
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                scopes=self.scopes,
+            )
+        except (ValueError, TypeError) as e:
+            # Handle validation errors
+            raise InvalidCredentialsError(f"Invalid OAuth credentials: {e}")
 
-        Args:
-            client_id: Google OAuth2 client ID
-            client_secret: Google OAuth2 client secret
-            refresh_token: OAuth2 refresh token
-            token_uri: OAuth2 token URI (default: Google's token endpoint)
-            save_path: Optional path to save credentials JSON file
+    def to_email_config(self) -> EmailConfig:
+        """Convert to EmailConfig for use with EmailClient."""
+        return EmailConfig(
+            email=self.email or "",
+            password=self.refresh_token,  # Use refresh token as password
+            imap_server="imap.gmail.com",
+            smtp_server="smtp.gmail.com",
+            imap_port=993,
+            smtp_port=587,
+            tls=True,
+        )
 
-        Returns:
-            GmailCredentials instance
-        """
-        creds = {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": refresh_token,
-            "token_uri": token_uri,
-            "type": "authorized_user",
-        }
+    def __str__(self) -> str:
+        """Show credentials without sensitive data."""
+        return (
+            f"GmailCredentials(client_id='{self.client_id}', "
+            f"token_uri='{self.token_uri}', "
+            f"scopes={self.scopes})"
+        )
+
+
+def load_credentials(path: Union[str, Path]) -> GmailCredentials:
+    """Load Gmail credentials from a JSON file.
+
+    Args:
+        path: Path to credentials JSON file
+
+    Returns:
+        GmailCredentials instance
+
+    Raises:
+        FileNotFoundError: If credentials file doesn't exist
+        InvalidCredentialsError: If credentials are invalid or missing fields
+    """
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise
+    except json.JSONDecodeError:
+        raise InvalidCredentialsError("Invalid JSON in credentials file")
+
+    try:
+        return GmailCredentials(**data)
+    except (TypeError, ValueError) as e:
+        raise InvalidCredentialsError(f"Invalid credentials format: {e}")
+
+
+def create_from_oauth_credentials(
+    creds: dict,
+    save_path: Optional[Union[str, Path]] = None,
+) -> GmailCredentials:
+    """Create Gmail credentials from OAuth2 credentials.
+
+    Args:
+        creds: Dictionary containing OAuth2 credentials
+        save_path: Optional path to save credentials JSON file
+
+    Returns:
+        GmailCredentials instance
+
+    Raises:
+        InvalidCredentialsError: If credentials are invalid
+    """
+    # Validate required fields first
+    if not all(
+        creds.get(field) for field in ["client_id", "client_secret", "refresh_token"]
+    ):
+        raise InvalidCredentialsError("Missing required fields")
+
+    try:
+        # Create Gmail credentials
+        gmail_creds = GmailCredentials(
+            client_id=creds["client_id"],
+            client_secret=creds["client_secret"],
+            refresh_token=creds["refresh_token"],
+            token_uri=creds.get("token_uri", "https://oauth2.googleapis.com/token"),
+            scopes=creds.get("scopes"),
+            email=creds.get("email"),
+        )
+
+        # Try creating OAuth credentials to validate
+        try:
+            gmail_creds.to_oauth_credentials()
+        except InvalidCredentialsError as e:
+            raise InvalidCredentialsError(f"Invalid OAuth credentials: {e}")
 
         if save_path:
             save_path = Path(save_path)
             save_path.parent.mkdir(parents=True, exist_ok=True)
             with open(save_path, "w") as f:
-                json.dump(creds, f, indent=2)
-            return cls(save_path)
+                json.dump(
+                    {
+                        "client_id": gmail_creds.client_id,
+                        "client_secret": gmail_creds.client_secret,
+                        "refresh_token": gmail_creds.refresh_token,
+                        "token_uri": gmail_creds.token_uri,
+                        "scopes": gmail_creds.scopes,
+                        "email": gmail_creds.email,
+                    },
+                    f,
+                    indent=2,
+                )
 
-        # If no save path, create temporary file
-        tmp_path = Path(os.getenv("TMPDIR", "/tmp")) / "gmail_creds.json"
-        with open(tmp_path, "w") as f:
-            json.dump(creds, f, indent=2)
-        return cls(tmp_path)
-
-    def to_email_config(self, email_address: str) -> EmailConfig:
-        """Convert Gmail credentials to EmailConfig.
-
-        Args:
-            email_address: Gmail address to use with these credentials
-
-        Returns:
-            EmailConfig configured for Gmail
-        """
-        return EmailConfig(
-            email=email_address,
-            password=self._credentials.get(
-                "refresh_token", ""
-            ),  # Use refresh token as password
-            imap_server="imap.gmail.com",
-            smtp_server="smtp.gmail.com",
-            tls=True,
-        )
-
-    @property
-    def client_id(self) -> str:
-        """Get OAuth2 client ID."""
-        return self._credentials.get("client_id", "")
-
-    @property
-    def client_secret(self) -> str:
-        """Get OAuth2 client secret."""
-        return self._credentials.get("client_secret", "")
-
-    @property
-    def refresh_token(self) -> str:
-        """Get OAuth2 refresh token."""
-        return self._credentials.get("refresh_token", "")
-
-    @property
-    def token_uri(self) -> str:
-        """Get OAuth2 token URI."""
-        return self._credentials.get("token_uri", "https://oauth2.googleapis.com/token")
+        return gmail_creds
+    except KeyError as e:
+        raise InvalidCredentialsError(f"Missing required field: {e}")
+    except InvalidCredentialsError:
+        raise
+    except Exception as e:
+        raise InvalidCredentialsError(f"Failed to create credentials: {e}")

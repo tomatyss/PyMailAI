@@ -1,4 +1,4 @@
-# PyMailAI
+# 📧 PyMailAI
 
 [![Documentation Status](https://github.com/tomatyss/PyMailAI/actions/workflows/docs.yml/badge.svg)](https://tomatyss.github.io/PyMailAI/)
 

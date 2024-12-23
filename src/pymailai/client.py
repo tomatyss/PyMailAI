@@ -88,12 +88,19 @@ class EmailClient:
     async def disconnect(self) -> None:
         """Close connections to email servers."""
         if self._imap:
-            await self._imap.logout()
-            logger.debug("Disconnected from IMAP server")
+            try:
+                await self._imap.logout()
+                logger.debug("Disconnected from IMAP server")
+            except Exception as e:
+                logger.warning("Error disconnecting from IMAP: %s", e)
             self._imap = None
+
         if self._smtp:
-            await self._smtp.quit()
-            logger.debug("Disconnected from SMTP server")
+            try:
+                await self._smtp.quit()
+                logger.debug("Disconnected from SMTP server")
+            except Exception as e:
+                logger.warning("Error disconnecting from SMTP: %s", e)
             self._smtp = None
 
     async def fetch_new_messages(self) -> AsyncGenerator[EmailData, None]:
@@ -122,38 +129,36 @@ class EmailClient:
             # Others return: [b'28 FETCH (FLAGS (\\Seen) RFC822 {5324}', b'raw email data', b')']
             logger.debug("Raw IMAP response for message %s: %s", num, msg_data)
 
-            email_body = None
-            for i, part in enumerate(msg_data):
-                logger.debug("Processing part %d: %s", i, part)
-                if isinstance(part, (list, tuple)):
-                    # Handle nested structure
-                    for j, item in enumerate(part):
-                        logger.debug("Processing nested item %d: %s", j, item)
-                        if isinstance(item, bytes):
-                            # Look for the actual email content
-                            # It should be a large chunk of bytes that doesn't start with FETCH
-                            # and isn't just a closing parenthesis
-                            if len(item) > 100 or (
-                                not item.startswith(b"FETCH")
+            # Get the email body from the message data
+            if isinstance(msg_data[0], tuple):
+                # Handle case where message data is a tuple containing (message_id, content)
+                email_body = msg_data[0][1]
+            else:
+                # Try to find the email content in the message data
+                email_body = None
+                for part in msg_data:
+                    if (
+                        isinstance(part, bytes)
+                        and not part.startswith(b"FETCH")
+                        and not part.endswith(b")")
+                    ):
+                        email_body = part
+                        break
+                    elif isinstance(part, (list, tuple)):
+                        for item in part:
+                            if (
+                                isinstance(item, bytes)
+                                and not item.startswith(b"FETCH")
                                 and not item.endswith(b")")
                             ):
                                 email_body = item
-                                logger.debug("Found email body in nested structure")
                                 break
-                elif isinstance(part, bytes):
-                    # Same logic for non-nested parts
-                    if len(part) > 100 or (
-                        not part.startswith(b"FETCH") and not part.endswith(b")")
-                    ):
-                        email_body = part
-                        logger.debug("Found email body in flat structure")
-                        break
+                        if email_body:
+                            break
 
             if not email_body:
                 logger.warning(
-                    "Could not find email body in message data for message %s: %s",
-                    num,
-                    msg_data,
+                    "Could not find email body in message data for message %s", num
                 )
                 continue
 
