@@ -263,3 +263,208 @@ def test_email_data_invalid_date():
 
     # Should use a valid timestamp for invalid dates
     assert isinstance(email_data.timestamp, datetime)
+
+
+def test_email_data_string_references():
+    """Test handling of string references in EmailData initialization."""
+    # Test with space-separated reference string
+    email_data = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Test message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="<ref1@example.com> <ref2@example.com>",
+    )
+    assert email_data.references == ["<ref1@example.com>", "<ref2@example.com>"]
+
+    # Test with single reference string
+    email_data = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Test message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="<ref1@example.com>",
+    )
+    assert email_data.references == ["<ref1@example.com>"]
+
+    # Test with empty string
+    email_data = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Test message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="",
+    )
+    assert email_data.references == []
+
+
+def test_email_data_invalid_references():
+    """Test handling of invalid references type."""
+    with pytest.raises(ValueError, match="References must be None, string, or list"):
+        EmailData(
+            message_id="<test123@example.com>",
+            subject="Test Subject",
+            from_address="sender@example.com",
+            to_addresses=["recipient@example.com"],
+            cc_addresses=[],
+            body_text="Test message",
+            body_html=None,
+            timestamp=datetime.now(),
+            references=123,  # Invalid type
+        )
+
+
+def test_create_reply_with_string_references():
+    """Test creating reply when original message has string references."""
+    # Test with space-separated reference string
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="<ref1@example.com> <ref2@example.com>",
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<ref1@example.com>", "<ref2@example.com>", "<test123@example.com>"]
+
+    # Test with single reference string
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="<ref1@example.com>",
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<ref1@example.com>", "<test123@example.com>"]
+
+    # Test with empty string references
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references="",
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<test123@example.com>"]
+
+
+def test_create_reply_with_list_references():
+    """Test creating reply when original message has list references."""
+    # Test with multiple references
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references=["<ref1@example.com>", "<ref2@example.com>"],
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<ref1@example.com>", "<ref2@example.com>", "<test123@example.com>"]
+
+    # Test with single reference
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references=["<ref1@example.com>"],
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<ref1@example.com>", "<test123@example.com>"]
+
+    # Test with empty list references
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references=[],
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<test123@example.com>"]
+
+
+def test_create_reply_with_none_references():
+    """Test creating reply when original message has None references."""
+    original = EmailData(
+        message_id="<test123@example.com>",
+        subject="Test Subject",
+        from_address="sender@example.com",
+        to_addresses=["recipient@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references=None,
+    )
+    reply = original.create_reply("Reply text")
+    assert reply.references == ["<test123@example.com>"]
+
+
+def test_create_reply_chain():
+    """Test creating a chain of replies to ensure references are properly maintained."""
+    # First message
+    original = EmailData(
+        message_id="<original@example.com>",
+        subject="Original Subject",
+        from_address="sender1@example.com",
+        to_addresses=["recipient1@example.com"],
+        cc_addresses=[],
+        body_text="Original message",
+        body_html=None,
+        timestamp=datetime.now(),
+        references=None,
+    )
+
+    # First reply
+    reply1 = original.create_reply("First reply")
+    reply1.message_id = "<reply1@example.com>"  # Simulate server setting message ID
+    assert reply1.references == ["<original@example.com>"]
+
+    # Second reply
+    reply2 = reply1.create_reply("Second reply")
+    reply2.message_id = "<reply2@example.com>"  # Simulate server setting message ID
+    assert reply2.references == ["<original@example.com>", "<reply1@example.com>"]
+
+    # Third reply
+    reply3 = reply2.create_reply("Third reply")
+    reply3.message_id = "<reply3@example.com>"  # Simulate server setting message ID
+    assert reply3.references == ["<original@example.com>", "<reply1@example.com>", "<reply2@example.com>"]
