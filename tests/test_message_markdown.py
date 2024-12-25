@@ -63,7 +63,10 @@ def test_markdown_code_block_conversion():
 
     assert html_part is not None
     assert "<h1>Code Example</h1>" in html_part
-    assert '<pre class="codehilite">' in html_part
+    assert 'class="codehilite"' in html_part
+    assert '<pre' in html_part
+    assert '<code' in html_part
+    assert 'class="language-python"' in html_part
     assert "Hello, world!" in html_part
 
 
