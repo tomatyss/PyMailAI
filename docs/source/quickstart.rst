@@ -64,10 +64,18 @@ Here's a simple example of creating an email agent that processes incoming email
    if __name__ == "__main__":
        asyncio.run(main())
 
-Gmail OAuth2 Setup (Recommended)
-------------------------------
+Gmail Authentication
+------------------
 
-For Gmail accounts, OAuth2 authentication is recommended over password authentication:
+pymailai supports two methods for Gmail authentication:
+
+1. OAuth2 (for personal Gmail accounts)
+2. Service Account (for Google Workspace accounts)
+
+OAuth2 Setup (Personal Gmail)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For personal Gmail accounts, OAuth2 authentication is recommended:
 
 1. Install with Gmail support:
 
@@ -113,6 +121,80 @@ For Gmail accounts, OAuth2 authentication is recommended over password authentic
        # Create and run agent
        async with EmailAgent(config, message_handler=message_handler) as agent:
            # ... rest of the code ...
+
+Service Account Setup (Google Workspace)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For Google Workspace accounts, service account authentication provides better security and control:
+
+1. Set up Google Cloud Project:
+
+   a. Go to the `Google Cloud Console <https://console.cloud.google.com/>`_
+   b. Create a new project or select an existing one
+   c. Enable the Gmail API
+   d. Create a service account
+   e. Download the service account JSON key file
+
+2. Configure Google Workspace:
+
+   a. Go to Admin Console -> Security -> API Controls
+   b. Under "Domain-wide Delegation", add your service account
+   c. Add the required scope: ``https://www.googleapis.com/auth/gmail.modify``
+
+3. Use service account in your code:
+
+.. code-block:: python
+
+   import asyncio
+   from pymailai import EmailAgent
+   from pymailai.gmail import ServiceAccountCredentials
+   from pymailai.gmail_client import GmailClient
+
+   async def main():
+       # Set up service account authentication
+       creds = ServiceAccountCredentials(
+           credentials_path="credentials.json",
+           delegated_email="user@yourdomain.com",
+           scopes=["https://www.googleapis.com/auth/gmail.modify"]
+       )
+
+       # Create Gmail client
+       client = GmailClient(creds.get_gmail_service())
+
+       # Create and run agent
+       async with EmailAgent(client, message_handler=message_handler) as agent:
+           # ... rest of the code ...
+
+Custom Email Clients
+-----------------
+
+pymailai provides a BaseEmailClient interface for implementing custom email clients:
+
+.. code-block:: python
+
+   from pymailai.base_client import BaseEmailClient
+   from pymailai.message import EmailData
+
+   class MyCustomClient(BaseEmailClient):
+       async def connect(self) -> None:
+           # Connect to email service
+           pass
+
+       async def disconnect(self) -> None:
+           # Disconnect from service
+           pass
+
+       async def fetch_new_messages(self) -> AsyncGenerator[EmailData, None]:
+           # Fetch new messages
+           pass
+
+       async def send_message(self, message: EmailData) -> None:
+           # Send a message
+           pass
+
+       async def mark_as_read(self, message_id: str) -> None:
+           # Mark message as read
+           pass
 
 AI Integration
 -------------
