@@ -1,5 +1,6 @@
 """Tests for email message threading functionality."""
 
+import re
 from datetime import datetime
 from pymailai.message import EmailData
 
@@ -71,14 +72,13 @@ def test_create_reply():
     assert reply.references == ["prev-id", "original-id"]
 
     # Check reply formatting (using regex to match since timestamp will vary)
-    import re
-    assert re.match(
+    pattern = (
         r"Reply text\n\n"
-        r"On .+, from@example\.com wrote:\n"
+        r"On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, from@example\.com wrote:\n"
         r">\n"
-        r"> Original message",
-        reply.body_text
+        r"> Original message"
     )
+    assert re.match(pattern, reply.body_text), f"Expected pattern not found in:\n{reply.body_text}"
 
     # Check other fields
     assert reply.subject == "Re: Original Subject"
@@ -88,7 +88,7 @@ def test_create_reply():
 
 def test_nested_reply_quotation():
     """Test increasing quotation levels in nested replies."""
-    # Original message
+    # Original message with fixed timestamp
     original = EmailData(
         message_id="original-id",
         subject="Original Subject",
@@ -97,35 +97,31 @@ def test_nested_reply_quotation():
         cc_addresses=[],
         body_text="Original message",
         body_html=None,
-        timestamp=datetime.now()
+        timestamp=datetime(2024, 1, 1, 14, 30)  # Fixed timestamp
     )
 
-    # First reply (using fixed timestamp for predictable testing)
-    reply1 = EmailData(
-        message_id="reply1-id",
-        subject="Re: Original Subject",
-        from_address="bob@example.com",
-        to_addresses=["alice@example.com"],
-        cc_addresses=[],
-        body_text="First reply\n\nOn Jan 01, 2024, at 02:30 PM, alice@example.com wrote:\n>\n> Original message",
-        body_html=None,
-        timestamp=datetime(2024, 1, 1, 14, 35)  # 5 minutes after original
-    )
+    # First reply (with proper from_address and fixed timestamp)
+    reply1 = original.create_reply("First reply")
+    reply1.from_address = "bob@example.com"  # Set the sender
+    reply1.timestamp = datetime(2024, 1, 1, 14, 35)  # 5 minutes after original
 
     # Second reply (to the first reply)
-    reply2 = reply1.create_reply("Second reply", quote_level=2)
+    reply2 = reply1.create_reply("Second reply")
+    reply2.from_address = "alice@example.com"  # Set the sender
+    reply2.timestamp = datetime(2024, 1, 1, 14, 40)  # 5 minutes after reply1
 
     # Check nested reply formatting with regex
-    assert re.match(
+    pattern = (
         r"Second reply\n\n"
-        r"On .+, bob@example\.com wrote:\n"
+        r"On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, bob@example\.com wrote:\n"
+        r">\n"
+        r"> First reply\n"
+        r">\n"
+        r"> On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, alice@example\.com wrote:\n"
         r">>\n"
-        r">> First reply\n\n"
-        r"On Jan 01, 2024, at 02:30 PM, alice@example\.com wrote:\n"
-        r">>\n"
-        r">> > Original message",
-        reply2.body_text
+        r">> Original message"
     )
+    assert re.match(pattern, reply2.body_text), f"Expected pattern not found in:\n{reply2.body_text}"
 
 
 def test_reply_without_history():

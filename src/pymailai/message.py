@@ -121,12 +121,44 @@ class EmailData:
 
         # Format the quoted text with proper indentation
         prefix = ">" * level
-        quoted_lines = [
-            f"{prefix} {line}" if line.strip() else prefix for line in text.splitlines()
-        ]
+        quoted_lines = []
+
+        # Split text into lines and process each line
+        lines = text.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Check if this line starts an embedded quote
+            if (
+                line.startswith("On ")
+                and i + 1 < len(lines)
+                and lines[i + 1].startswith(">")
+            ):
+                # Found an embedded quote, preserve its structure but add our quote level
+                quoted_lines.append(f"{prefix} {line}")
+                i += 1
+                while i < len(lines) and (
+                    lines[i].startswith(">") or not lines[i].strip()
+                ):
+                    if lines[i].startswith(">"):
+                        # Add our quote level to the existing quote
+                        quoted_lines.append(f"{prefix}{lines[i]}")
+                    else:
+                        # Empty line within quote
+                        quoted_lines.append(prefix)
+                    i += 1
+                continue
+
+            # Regular line
+            if line.strip():
+                quoted_lines.append(f"{prefix} {line}")
+            else:
+                quoted_lines.append(prefix)
+            i += 1
 
         # Combine attribution with quoted text
-        return f"{attribution}\n{prefix}\n{prefix} " + f"\n{prefix} ".join(quoted_lines)
+        return f"{attribution}\n{prefix}\n" + "\n".join(quoted_lines)
 
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
