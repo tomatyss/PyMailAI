@@ -1,6 +1,13 @@
 # 📧 PyMailAI
 
 [![Documentation Status](https://github.com/tomatyss/PyMailAI/actions/workflows/docs.yml/badge.svg)](https://tomatyss.github.io/PyMailAI/)
+[![PyPI version](https://badge.fury.io/py/pymailai.svg)](https://badge.fury.io/py/pymailai)
+[![Python](https://img.shields.io/pypi/pyversions/pymailai.svg)](https://pypi.org/project/pymailai/)
+[![Tests](https://github.com/tomatyss/PyMailAI/actions/workflows/tests.yml/badge.svg)](https://github.com/tomatyss/PyMailAI/actions/workflows/tests.yml)
+[![Coverage](https://codecov.io/gh/tomatyss/PyMailAI/branch/main/graph/badge.svg)](https://codecov.io/gh/tomatyss/PyMailAI)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://pepy.tech/badge/pymailai)](https://pepy.tech/project/pymailai)
 
 PyMailAI is a Python package that enables AI agents to use email as an input/output interface. It provides simple wrappers to:
 1. Get prompts from incoming emails
