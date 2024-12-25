@@ -1,6 +1,6 @@
 # PyMailAI Makefile
 
-.PHONY: help install install-hooks test test-cov format lint type-check clean
+.PHONY: help install install-hooks test test-cov format lint type-check clean build deploy
 
 help:
 	@echo "Available commands:"
@@ -12,6 +12,8 @@ help:
 	@echo "  make lint        Run linting checks"
 	@echo "  make type-check  Run type checking"
 	@echo "  make clean       Remove build artifacts"
+	@echo "  make build       Build distribution packages"
+	@echo "  make deploy      Upload to PyPI (requires PyPI token)"
 
 install:
 	pip install -e ".[dev]"
@@ -47,3 +49,9 @@ clean:
 	rm -rf .mypy_cache
 	rm -rf __pycache__
 	find . -type d -name "__pycache__" -exec rm -r {} +
+
+build: clean
+	python -m build
+
+deploy: build
+	python -m twine upload dist/*
