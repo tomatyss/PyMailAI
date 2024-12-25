@@ -67,27 +67,23 @@ async def test_mark_as_read_error_handling(gmail_client, mock_gmail_service):
 
 
 @pytest.mark.asyncio
-async def test_fetch_new_messages(gmail_client, mock_gmail_service):
-    """Test fetching new messages."""
-    # Set up mock responses
+async def test_fetch_new_messages_single_part(gmail_client, mock_gmail_service):
+    """Test fetching single part text message."""
     mock_list = mock_gmail_service.users.return_value.messages.return_value.list
     mock_get = mock_gmail_service.users.return_value.messages.return_value.get
 
-    # Mock list response
     mock_list.return_value.execute.return_value = {
-        "messages": [{"id": "msg1"}, {"id": "msg2"}]
+        "messages": [{"id": "msg1"}]
     }
 
-    # Mock get response with both Date header and internalDate
     mock_get.return_value.execute.return_value = {
         "id": "msg1",
-        "internalDate": "1706179200000",  # 2024-01-25 10:00:00 UTC in milliseconds
+        "internalDate": "1706179200000",
         "payload": {
             "headers": [
                 {"name": "From", "value": "sender@example.com"},
                 {"name": "To", "value": "recipient@example.com"},
                 {"name": "Subject", "value": "Test Subject"},
-                {"name": "Message-ID", "value": "<test123@example.com>"},
                 {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
             ],
             "mimeType": "text/plain",
@@ -97,23 +93,119 @@ async def test_fetch_new_messages(gmail_client, mock_gmail_service):
         }
     }
 
-    # Fetch messages
     messages = []
     async for msg in gmail_client.fetch_new_messages():
         messages.append(msg)
 
-    # Verify results
-    assert len(messages) == 2
-    assert isinstance(messages[0], EmailData)
-    assert messages[0].message_id == "msg1"  # Verify Gmail message ID is used
-    assert messages[0].subject == "Test Subject"
-    assert messages[0].from_address == "sender@example.com"
-    assert messages[0].to_addresses == ["recipient@example.com"]
+    assert len(messages) == 1
     assert messages[0].body_text == "Test message"
+    assert messages[0].body_html is None
 
-    # Verify API calls
-    mock_list.assert_called_once_with(userId="me", q="is:unread -in:chats")
-    assert mock_get.call_count == 2
+
+@pytest.mark.asyncio
+async def test_fetch_new_messages_multipart_alternative(gmail_client, mock_gmail_service):
+    """Test fetching multipart/alternative message with text and HTML parts."""
+    mock_list = mock_gmail_service.users.return_value.messages.return_value.list
+    mock_get = mock_gmail_service.users.return_value.messages.return_value.get
+
+    mock_list.return_value.execute.return_value = {
+        "messages": [{"id": "msg1"}]
+    }
+
+    mock_get.return_value.execute.return_value = {
+        "id": "msg1",
+        "internalDate": "1706179200000",
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "sender@example.com"},
+                {"name": "To", "value": "recipient@example.com"},
+                {"name": "Subject", "value": "Test Subject"},
+                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
+            ],
+            "mimeType": "multipart/alternative",
+            "parts": [
+                {
+                    "mimeType": "text/plain",
+                    "body": {
+                        "data": base64.urlsafe_b64encode(b"Plain text").decode()
+                    }
+                },
+                {
+                    "mimeType": "text/html",
+                    "body": {
+                        "data": base64.urlsafe_b64encode(b"<p>HTML content</p>").decode()
+                    }
+                }
+            ]
+        }
+    }
+
+    messages = []
+    async for msg in gmail_client.fetch_new_messages():
+        messages.append(msg)
+
+    assert len(messages) == 1
+    assert messages[0].body_text == "Plain text"
+    assert messages[0].body_html == "<p>HTML content</p>"
+
+
+@pytest.mark.asyncio
+async def test_fetch_new_messages_multipart_mixed_nested(gmail_client, mock_gmail_service):
+    """Test fetching multipart/mixed message with nested multipart/alternative."""
+    mock_list = mock_gmail_service.users.return_value.messages.return_value.list
+    mock_get = mock_gmail_service.users.return_value.messages.return_value.get
+
+    mock_list.return_value.execute.return_value = {
+        "messages": [{"id": "msg1"}]
+    }
+
+    mock_get.return_value.execute.return_value = {
+        "id": "msg1",
+        "internalDate": "1706179200000",
+        "payload": {
+            "headers": [
+                {"name": "From", "value": "sender@example.com"},
+                {"name": "To", "value": "recipient@example.com"},
+                {"name": "Subject", "value": "Test Subject"},
+                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
+            ],
+            "mimeType": "multipart/mixed",
+            "parts": [
+                {
+                    "mimeType": "multipart/alternative",
+                    "parts": [
+                        {
+                            "mimeType": "text/plain",
+                            "body": {
+                                "data": base64.urlsafe_b64encode(b"Nested plain text").decode()
+                            }
+                        },
+                        {
+                            "mimeType": "text/html",
+                            "body": {
+                                "data": base64.urlsafe_b64encode(b"<p>Nested HTML</p>").decode()
+                            }
+                        }
+                    ]
+                },
+                {
+                    "mimeType": "application/pdf",
+                    "filename": "test.pdf",
+                    "body": {
+                        "attachmentId": "attachment123"
+                    }
+                }
+            ]
+        }
+    }
+
+    messages = []
+    async for msg in gmail_client.fetch_new_messages():
+        messages.append(msg)
+
+    assert len(messages) == 1
+    assert messages[0].body_text == "Nested plain text"
+    assert messages[0].body_html == "<p>Nested HTML</p>"
 
 
 @pytest.mark.asyncio

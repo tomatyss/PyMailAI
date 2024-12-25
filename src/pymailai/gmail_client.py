@@ -62,23 +62,38 @@ class GmailClient(BaseEmailClient):
                     body_text = None
                     body_html = None
 
-                    if "parts" in msg["payload"]:
-                        parts = msg["payload"]["parts"]
-                        for part in parts:
-                            if part["mimeType"] == "text/plain":
-                                data = part["body"].get("data", "")
+                    def extract_parts(part):
+                        nonlocal body_text, body_html
+
+                        if part.get("mimeType") == "multipart/alternative":
+                            # Handle nested multipart/alternative
+                            for subpart in part.get("parts", []):
+                                extract_parts(subpart)
+                        elif part.get("mimeType") == "multipart/mixed":
+                            # Handle nested multipart/mixed
+                            for subpart in part.get("parts", []):
+                                extract_parts(subpart)
+                        elif part.get("mimeType") == "text/plain":
+                            data = part.get("body", {}).get("data", "")
+                            if data:
                                 body_text = base64.urlsafe_b64decode(data).decode()
-                            elif part["mimeType"] == "text/html":
-                                data = part["body"].get("data", "")
+                        elif part.get("mimeType") == "text/html":
+                            data = part.get("body", {}).get("data", "")
+                            if data:
                                 body_html = base64.urlsafe_b64decode(data).decode()
+
+                    # Start extraction from the payload
+                    if msg["payload"].get("mimeType", "").startswith("multipart/"):
+                        extract_parts(msg["payload"])
                     else:
                         # Single part message
                         data = msg["payload"]["body"].get("data", "")
-                        content = base64.urlsafe_b64decode(data).decode()
-                        if msg["payload"]["mimeType"] == "text/html":
-                            body_html = content
-                        else:
-                            body_text = content
+                        if data:
+                            content = base64.urlsafe_b64decode(data).decode()
+                            if msg["payload"]["mimeType"] == "text/html":
+                                body_html = content
+                            else:
+                                body_text = content
 
                     # Parse timestamp from headers or use message internal date
                     date_str = headers.get("Date")
