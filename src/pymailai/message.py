@@ -6,6 +6,8 @@ from email import utils
 from email.message import EmailMessage
 from typing import Any, Dict, List, Optional, Tuple
 
+from pymailai.markdown_converter import MarkdownConverter
+
 
 @dataclass
 class EmailData:
@@ -171,16 +173,27 @@ class EmailData:
         if self.references:
             msg["References"] = " ".join(self.references)
 
+        # Convert markdown to HTML if no HTML content is provided and text appears to be markdown
+        html_content = self.body_html
+        if not html_content and any(
+            marker in self.body_text for marker in ["```", "#", "**", "__", ">", "-"]
+        ):
+            converter = MarkdownConverter()
+            html_content = converter.convert(self.body_text)
+        elif html_content:
+            # Use existing HTML content as is
+            html_content = self.body_html
+
         # Start with mixed if we have attachments
         if self.attachments:
             msg.make_mixed()
 
             # Create content part
             content = EmailMessage()
-            if self.body_html:
+            if html_content:
                 content.make_alternative()
                 content.add_alternative(self.body_text, subtype="plain")
-                content.add_alternative(self.body_html, subtype="html")
+                content.add_alternative(html_content, subtype="html")
             else:
                 content.set_content(self.body_text)
             msg.attach(content)
@@ -195,10 +208,10 @@ class EmailData:
                 )
         else:
             # No attachments
-            if self.body_html:
+            if html_content:
                 msg.make_alternative()
                 msg.add_alternative(self.body_text, subtype="plain")
-                msg.add_alternative(self.body_html, subtype="html")
+                msg.add_alternative(html_content, subtype="html")
             else:
                 msg.set_content(self.body_text)
 
