@@ -6,7 +6,10 @@ This section provides examples of how to use pymailai in different scenarios.
 OpenAI Integration
 ----------------
 
-This example shows how to create an email agent that processes incoming emails using OpenAI's GPT model
+Basic Example
+~~~~~~~~~~~
+
+This example shows how to create a simple email agent that processes incoming emails using OpenAI's GPT model
 and sends back AI-generated responses.
 
 .. literalinclude:: ../../examples/openai_completion.py
@@ -15,7 +18,50 @@ and sends back AI-generated responses.
    :name: openai_example
    :linenos:
 
-To run this example:
+Advanced Example with Email Threading
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example shows how to create an email agent that maintains proper email threading, including quoted
+original messages and correct threading metadata.
+
+.. literalinclude:: ../../examples/openai_completion_with_threading.py
+   :language: python
+   :caption: OpenAI Email Agent with Threading Example
+   :name: openai_threading_example
+   :linenos:
+
+Key features of the threading example:
+
+- Uses ``create_reply()`` to generate properly formatted responses
+- Includes the original message as quoted text
+- Sets correct threading metadata (References and In-Reply-To headers)
+- Ensures emails appear properly threaded in email clients
+
+Email Threading Best Practices
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating email responses, it's important to maintain proper threading for a better user experience:
+
+1. Include the original message as quoted text using ``create_reply()``
+2. Preserve threading metadata for email client compatibility
+3. Maintain conversation context with proper message quoting
+4. Keep CC recipients in the loop
+
+Example of creating a threaded reply:
+
+.. code-block:: python
+
+    # Create a properly threaded reply
+    reply = message.create_reply(
+        reply_text="Your response here",
+        include_history=True  # Include quoted original message
+    )
+    reply.from_address = "your-email@example.com"
+
+Running the Examples
+~~~~~~~~~~~~~~~~
+
+To run these examples:
 
 1. Install the required dependencies:
 
