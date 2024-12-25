@@ -55,8 +55,8 @@ async def process_with_openai(message: EmailData) -> Optional[EmailData]:
 async def main():
     # Configure email settings
     config = EmailConfig(
-        imap_server=os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com"),
-        smtp_server=os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com"),
+        imap_server=os.getenv("IMAP_SERVER", "imap.gmail.com"),
+        smtp_server=os.getenv("SMTP_SERVER", "smtp.gmail.com"),
         email=os.getenv("EMAIL_ADDRESS"),
         password=os.getenv("EMAIL_PASSWORD"),
         smtp_port=465  # Use implicit SSL/TLS port

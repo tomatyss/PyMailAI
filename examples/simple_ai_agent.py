@@ -38,8 +38,8 @@ async def main():
     """Run the email agent with the AI message handler."""
     # Load configuration from environment variables
     config = EmailConfig(
-        imap_server=os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com"),
-        smtp_server=os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com"),
+        imap_server=os.getenv("IMAP_SERVER", "imap.gmail.com"),
+        smtp_server=os.getenv("SMTP_SERVER", "smtp.gmail.com"),
         email=os.getenv("EMAIL_ADDRESS"),
         password=os.getenv("EMAIL_PASSWORD")
     )

@@ -171,7 +171,37 @@ Full documentation is available at [https://tomatyss.github.io/PyMailAI/](https:
 Check the `examples/` directory for more examples:
 - `openai_completion.py`: Basic OpenAI integration
 - `anthropic_computer_agent.py`: Anthropic computer-use agent
+- `ollama_completion.py`: Local LLM integration with Ollama
 - `simple_ai_agent.py`: Template for custom agents
+
+### Ollama Integration
+
+To use PyMailAI with Ollama's local LLM models:
+
+1. Install the required dependencies:
+```bash
+pip install "pymailai[ollama]"
+```
+
+2. Install and start Ollama from https://ollama.ai, then pull the model:
+```bash
+ollama pull llama3.2
+```
+
+3. Set up your environment variables:
+```bash
+export EMAIL_ADDRESS="your-email@example.com"
+export EMAIL_PASSWORD="your-email-password"
+export EMAIL_IMAP_SERVER="your-imap-server"
+export EMAIL_SMTP_SERVER="your-smtp-server"
+export EMAIL_IMAP_PORT="993"
+export EMAIL_SMTP_PORT="465"
+```
+
+4. Run the Ollama example:
+```bash
+python examples/ollama_completion.py
+```
 
 ## Contributing
 
