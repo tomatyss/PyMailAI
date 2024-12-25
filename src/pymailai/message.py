@@ -101,6 +101,63 @@ class EmailData:
         parsed = utils.parsedate_tz(date_str)
         return parsed if parsed is not None else default_tuple
 
+    @staticmethod
+    def _format_quoted_text(text: str, level: int = 1) -> str:
+        """Format text with email-style quotation marks.
+
+        Args:
+            text: The text to quote
+            level: The quotation level (number of '>' characters to prepend)
+
+        Returns:
+            The quoted text with '>' characters prepended to each line
+        """
+        prefix = ">" * level
+        return "\n".join(
+            f"{prefix} {line}" if line.strip() else prefix for line in text.splitlines()
+        )
+
+    def create_reply(
+        self, reply_text: str, include_history: bool = True, quote_level: int = 1
+    ) -> "EmailData":
+        """Create a reply EmailData object with proper threading fields set.
+
+        Args:
+            reply_text: The text of the reply message
+            include_history: Whether to include quoted message history
+            quote_level: The quotation level for the previous message
+
+        Returns:
+            A new EmailData object configured as a reply to this message
+        """
+        # Build references list
+        new_references = [] if self.references is None else self.references.copy()
+        if self.message_id:
+            new_references.append(self.message_id)
+
+        # Format body text with quotations if including history
+        body_text = reply_text
+        if include_history:
+            quoted = self._format_quoted_text(self.body_text, quote_level)
+            body_text = f"{reply_text}\n\n{quoted}"
+
+        # Create reply email data
+        return EmailData(
+            message_id="",  # Will be set by email server
+            subject=f"Re: {self.subject}"
+            if not self.subject.startswith("Re: ")
+            else self.subject,
+            from_address="",  # Should be set by caller
+            to_addresses=[self.from_address],
+            cc_addresses=self.cc_addresses,
+            body_text=body_text,
+            body_html=None,  # HTML version would need to be generated separately
+            timestamp=datetime.now(),
+            references=new_references,
+            in_reply_to=self.message_id,
+            attachments=[],
+        )
+
     def to_email_message(self) -> EmailMessage:
         """Convert EmailData to an email.message.EmailMessage object."""
         msg = EmailMessage()
