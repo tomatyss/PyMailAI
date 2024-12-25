@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any, Callable, Coroutine, Optional, Union, cast
 
+from pymailai.base_client import BaseEmailClient
 from pymailai.client import EmailClient
 from pymailai.config import EmailConfig
 from pymailai.message import EmailData
@@ -18,17 +19,23 @@ class EmailAgent:
     """Process incoming emails and generate responses using AI."""
 
     def __init__(
-        self, config: EmailConfig, message_handler: Optional[MessageHandler] = None
+        self,
+        config_or_client: Union[EmailConfig, BaseEmailClient],
+        message_handler: Optional[MessageHandler] = None,
     ):
         """Initialize the email agent.
 
         Args:
-            config: Email configuration settings
+            config_or_client: Either EmailConfig for IMAP/SMTP or a BaseEmailClient instance
             message_handler: Optional async callback for custom message processing
         """
-        self.config = config
+        self.config = (
+            config_or_client if isinstance(config_or_client, EmailConfig) else None
+        )
         self.message_handler = message_handler
-        self._client: Optional[EmailClient] = None
+        self._client = (
+            None if isinstance(config_or_client, EmailConfig) else config_or_client
+        )
         self._running = False
         self._task: Optional[asyncio.Task] = None
 
@@ -79,13 +86,20 @@ class EmailAgent:
 
     async def _run(self) -> None:
         """Run loop for the email agent."""
-        self._client = EmailClient(self.config)
+        if not self._client and self.config:
+            self._client = cast(BaseEmailClient, EmailClient(self.config))
 
         try:
+            if not self._client:
+                raise RuntimeError("Email client not initialized")
+
             async with self._client:
                 while self._running:
                     await self._check_messages()
-                    await asyncio.sleep(self.config.check_interval)
+                    # Use config interval if available, otherwise default to 60 seconds
+                    await asyncio.sleep(
+                        self.config.check_interval if self.config else 60
+                    )
         finally:
             self._client = None
 
