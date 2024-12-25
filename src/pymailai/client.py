@@ -8,13 +8,14 @@ from typing import AsyncGenerator, Optional
 import aioimaplib
 import aiosmtplib
 
+from pymailai.base_client import BaseEmailClient
 from pymailai.config import EmailConfig
 from pymailai.message import EmailData
 
 logger = logging.getLogger(__name__)
 
 
-class EmailClient:
+class EmailClient(BaseEmailClient):
     """Asynchronous email client for IMAP and SMTP operations."""
 
     def __init__(self, config: EmailConfig):

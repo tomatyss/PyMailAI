@@ -89,17 +89,23 @@ The agent will monitor the specified email account and:
 2. Send the email content to Anthropic's API
 3. Send back the AI-generated response to the original sender
 
-Gmail OAuth2 Integration
-----------------------
+Gmail Authentication
+-----------------
 
-This example shows how to use Gmail OAuth2 authentication instead of password-based authentication.
-This is the recommended approach for Gmail accounts as it provides better security and avoids
-issues with 2-factor authentication and app-specific passwords.
+pymailai supports two methods for Gmail authentication:
+
+1. OAuth2 (for personal Gmail accounts)
+2. Service Account (for Google Workspace accounts)
+
+OAuth2 Authentication
+~~~~~~~~~~~~~~~~~~
+
+This example shows how to use Gmail OAuth2 authentication for personal Gmail accounts.
 
 .. literalinclude:: ../../examples/gmail_credentials.py
    :language: python
-   :caption: Gmail Credentials Example
-   :name: gmail_example
+   :caption: Gmail OAuth2 Example
+   :name: gmail_oauth2_example
    :linenos:
 
 To use Gmail with OAuth2 credentials:
@@ -130,8 +136,45 @@ To use Gmail with OAuth2 credentials:
       # Run the example to save credentials
       python examples/gmail_credentials.py
 
-The credentials will be saved to ``~/.config/pymailai/gmail_creds.json``. Future runs will load
-the credentials from this file automatically.
+Service Account Authentication
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example shows how to use Gmail service account authentication for Google Workspace accounts.
+
+.. literalinclude:: ../../examples/gmail_service_account.py
+   :language: python
+   :caption: Gmail Service Account Example
+   :name: gmail_service_account_example
+   :linenos:
+
+To use Gmail with service account authentication:
+
+1. Set up Google Cloud Project:
+
+   a. Go to the `Google Cloud Console <https://console.cloud.google.com/>`_
+   b. Create a new project or select an existing one
+   c. Enable the Gmail API
+   d. Create a service account:
+      - Click "Create Service Account"
+      - Download the JSON key file
+   e. Configure domain-wide delegation:
+      - Go to Google Workspace Admin Console
+      - Security -> API Controls -> Domain-wide Delegation
+      - Add the service account's client ID
+      - Add scope: ``https://www.googleapis.com/auth/gmail.modify``
+
+2. Run the example:
+
+   .. code-block:: bash
+
+      # Update SERVICE_ACCOUNT_FILE and USER_EMAIL in the example
+      python examples/gmail_service_account.py
+
+The service account provides:
+- Better security through domain-wide delegation
+- No need for user interaction
+- Support for multiple user impersonation
+- Direct Gmail API access
 
 Logging Configuration
 ------------------
@@ -155,18 +198,19 @@ level and output format:
 
 The following components have dedicated loggers:
 
-- pymailai.client: Email client operations (SMTP/IMAP connections, message operations)
-- pymailai.agent: AI agent activities (message processing, AI interactions)
-- pymailai.gmail: Gmail-specific operations (OAuth2, credential management)
+- pymailai.client: Email client operations (SMTP/IMAP connections)
+- pymailai.agent: AI agent activities (message processing)
+- pymailai.gmail: Gmail-specific operations (OAuth2, service accounts)
+- pymailai.gmail_client: Gmail API operations
 
-Example log output at DEBUG level:
+Example log output at INFO level:
 
 .. code-block:: text
 
-   2023-07-20 10:15:30,123 - pymailai.client - DEBUG - Connecting to SMTP server smtp.gmail.com:587
-   2023-07-20 10:15:30,456 - pymailai.client - INFO - Successfully connected to SMTP server
-   2023-07-20 10:15:30,789 - pymailai.gmail - DEBUG - Refreshing OAuth2 token
-   2023-07-20 10:15:31,012 - pymailai.client - INFO - Successfully authenticated with OAuth2
+   2024-03-20 10:15:30,123 - pymailai.gmail - INFO - Gmail service initialized for user@domain.com
+   2024-03-20 10:15:30,456 - pymailai.gmail_client - INFO - Found 1 unread messages
+   2024-03-20 10:15:30,789 - pymailai.agent - INFO - Processing message from: sender@example.com
+   2024-03-20 10:15:31,012 - pymailai.gmail_client - INFO - Message sent successfully with ID: msg-123
 
 Ollama Integration
 ----------------
