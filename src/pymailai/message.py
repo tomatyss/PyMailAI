@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from email import utils
 from email.message import EmailMessage
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pymailai.markdown_converter import MarkdownConverter
 
@@ -21,14 +21,31 @@ class EmailData:
     body_text: str
     body_html: Optional[str]
     timestamp: datetime
-    references: Optional[List[str]] = None
+    references: Optional[Union[List[str], str]] = None
     in_reply_to: Optional[str] = None
     attachments: List[Dict[str, Any]] = None  # type: ignore
 
     def __post_init__(self) -> None:
-        """Initialize empty lists for None values."""
+        """Initialize empty lists for None values and ensure references is a list."""
         self.attachments = [] if self.attachments is None else self.attachments
-        self.references = [] if self.references is None else self.references
+
+        # Convert references to List[str]
+        if self.references is None:
+            self.references = []
+        elif isinstance(self.references, str):
+            # Convert string to list
+            self.references = (
+                [ref.strip() for ref in self.references.split()]
+                if self.references.strip()
+                else []
+            )
+        elif isinstance(self.references, list):
+            # Already a list, no need to cast
+            pass
+        else:
+            raise ValueError(
+                f"References must be None, string, or list, not {type(self.references)}"
+            )
 
     @classmethod
     def from_email_message(cls, msg: EmailMessage) -> "EmailData":
@@ -174,7 +191,17 @@ class EmailData:
             A new EmailData object configured as a reply to this message
         """
         # Build references list
-        new_references = [] if self.references is None else self.references.copy()
+        if isinstance(self.references, str):
+            # Convert string references to list before copying
+            new_references = (
+                [ref.strip() for ref in self.references.split()]
+                if self.references.strip()
+                else []
+            )
+        else:
+            # None or List[str]
+            new_references = [] if self.references is None else self.references.copy()
+
         if self.message_id:
             new_references.append(self.message_id)
 

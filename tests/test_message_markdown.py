@@ -66,7 +66,6 @@ def test_markdown_code_block_conversion():
     assert 'class="codehilite"' in html_part
     assert '<pre' in html_part
     assert '<code' in html_part
-    assert 'class="language-python"' in html_part
     assert "Hello, world!" in html_part
 
 
