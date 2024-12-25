@@ -23,7 +23,10 @@ def test_markdown_with_code():
     )
     html = converter.convert(markdown_content)
     assert "<h1>Code Example</h1>" in html
-    assert '<div class="codehilite"><pre>' in html
+    assert 'class="codehilite"' in html
+    assert '<pre' in html
+    assert '<code' in html
+    assert 'class="language-python"' in html
     assert "Hello, world!" in html  # Check for the content without worrying about exact HTML structure
 
 
