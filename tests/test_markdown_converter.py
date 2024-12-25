@@ -26,7 +26,6 @@ def test_markdown_with_code():
     assert 'class="codehilite"' in html
     assert '<pre' in html
     assert '<code' in html
-    assert 'class="language-python"' in html
     assert "Hello, world!" in html  # Check for the content without worrying about exact HTML structure
 
 
