@@ -59,12 +59,12 @@ async def process_with_ollama(message: EmailData) -> Optional[EmailData]:
 async def main():
     # Configure email settings - requires explicit server configuration
     config = EmailConfig(
-        imap_server=os.getenv("EMAIL_IMAP_SERVER"),
-        smtp_server=os.getenv("EMAIL_SMTP_SERVER"),
+        imap_server=os.getenv("IMAP_SERVER"),
+        smtp_server=os.getenv("SMTP_SERVER"),
         email=os.getenv("EMAIL_ADDRESS"),
         password=os.getenv("EMAIL_PASSWORD"),
-        smtp_port=int(os.getenv("EMAIL_SMTP_PORT", "465")),  # SSL/TLS port by default
-        imap_port=int(os.getenv("EMAIL_IMAP_PORT", "993")),  # SSL/TLS port by default
+        smtp_port=int(os.getenv("SMTP_PORT", "465")),  # SSL/TLS port by default
+        imap_port=int(os.getenv("IMAP_PORT", "993")),  # SSL/TLS port by default
     )
 
     # Create and run email agent
