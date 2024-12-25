@@ -167,7 +167,8 @@ async def test_fetch_new_messages_multipart_mixed_nested(gmail_client, mock_gmai
                 {"name": "From", "value": "sender@example.com"},
                 {"name": "To", "value": "recipient@example.com"},
                 {"name": "Subject", "value": "Test Subject"},
-                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
+                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"},
+                {"name": "Message-ID", "value": "<test123@example.com>"}
             ],
             "mimeType": "multipart/mixed",
             "parts": [
@@ -177,13 +178,27 @@ async def test_fetch_new_messages_multipart_mixed_nested(gmail_client, mock_gmai
                         {
                             "mimeType": "text/plain",
                             "body": {
-                                "data": base64.urlsafe_b64encode(b"Nested plain text").decode()
+                                "data": base64.urlsafe_b64encode(b"""Hello!
+
+Here's a test message with multiple sections:
+
+- Section 1: Testing
+- Section 2: Verification
+- Section 3: Validation
+
+Next steps:
+1. Check plain text extraction
+2. Verify HTML content
+3. Confirm attachment handling
+
+Best regards,
+Test User""").decode()
                             }
                         },
                         {
                             "mimeType": "text/html",
                             "body": {
-                                "data": base64.urlsafe_b64encode(b"<p>Nested HTML</p>").decode()
+                                "data": base64.urlsafe_b64encode(b"""<div dir="ltr">Hello!<br><br>Here's a test message with multiple sections:<br><br>- Section 1: Testing<br>- Section 2: Verification<br>- Section 3: Validation<br><br>Next steps:<br>1. Check plain text extraction<br>2. Verify HTML content<br>3. Confirm attachment handling<br><br>Best regards,<br>Test User</div>""").decode()
                             }
                         }
                     ]
@@ -204,8 +219,21 @@ async def test_fetch_new_messages_multipart_mixed_nested(gmail_client, mock_gmai
         messages.append(msg)
 
     assert len(messages) == 1
-    assert messages[0].body_text == "Nested plain text"
-    assert messages[0].body_html == "<p>Nested HTML</p>"
+    assert messages[0].message_id == "msg1"
+    assert messages[0].subject == "Test Subject"
+    assert messages[0].from_address == "sender@example.com"
+    assert messages[0].to_addresses == ["recipient@example.com"]
+
+    # Verify both plain text and HTML content are extracted
+    assert "Hello!" in messages[0].body_text
+    assert "Section 1: Testing" in messages[0].body_text
+    assert "Next steps:" in messages[0].body_text
+    assert "Best regards," in messages[0].body_text
+
+    assert "<div dir=\"ltr\">" in messages[0].body_html
+    assert "Section 1: Testing" in messages[0].body_html
+    assert "Next steps:" in messages[0].body_html
+    assert "<br>Test User</div>" in messages[0].body_html
 
 
 @pytest.mark.asyncio
