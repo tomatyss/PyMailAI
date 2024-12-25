@@ -103,21 +103,30 @@ class EmailData:
         parsed = utils.parsedate_tz(date_str)
         return parsed if parsed is not None else default_tuple
 
-    @staticmethod
-    def _format_quoted_text(text: str, level: int = 1) -> str:
-        """Format text with email-style quotation marks.
+    def _format_quoted_text(self, text: str, level: int = 1) -> str:
+        """Format text with email-style quotation marks and attribution.
 
         Args:
             text: The text to quote
             level: The quotation level (number of '>' characters to prepend)
 
         Returns:
-            The quoted text with '>' characters prepended to each line
+            The quoted text with attribution and '>' characters prepended to each line
         """
+        # Format the date to a readable string
+        date_str = self.timestamp.strftime("%b %d, %Y, at %I:%M %p")
+
+        # Create attribution line
+        attribution = f"On {date_str}, {self.from_address} wrote:"
+
+        # Format the quoted text with proper indentation
         prefix = ">" * level
-        return "\n".join(
+        quoted_lines = [
             f"{prefix} {line}" if line.strip() else prefix for line in text.splitlines()
-        )
+        ]
+
+        # Combine attribution with quoted text
+        return f"{attribution}\n{prefix}\n{prefix} " + f"\n{prefix} ".join(quoted_lines)
 
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
