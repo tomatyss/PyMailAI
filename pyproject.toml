@@ -1,7 +1,8 @@
 [project]
 name = "pymailai"
-version = "0.1.4"
+version = "0.1.5"
 description = "Email interface for AI agents"
+homepage = "https://github.com/tomatyss/PyMailAI"
 license = "MIT"
 authors = [
     { name = "Ivan Iufriakov" }
