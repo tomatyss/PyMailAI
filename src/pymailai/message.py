@@ -50,7 +50,7 @@ class EmailData:
     @classmethod
     def from_email_message(cls, msg: EmailMessage) -> "EmailData":
         """Create EmailData from an email.message.EmailMessage object."""
-        body_text = ""
+        body_text_parts = []
         body_html = None
         attachments = []
 
@@ -61,9 +61,10 @@ class EmailData:
                     continue
 
                 content_type = part.get_content_type()
-                disposition = part.get("Content-Disposition", "")
 
-                if "attachment" in disposition:
+                # Handle attachments and inline images
+                disposition = part.get("Content-Disposition", "")
+                if "attachment" in disposition or content_type.startswith("image/"):
                     attachments.append(
                         {
                             "filename": part.get_filename(),
@@ -74,7 +75,7 @@ class EmailData:
                 elif content_type == "text/plain":
                     payload = part.get_payload(decode=True)
                     assert isinstance(payload, bytes)  # type assertion for mypy
-                    body_text = payload.decode()
+                    body_text_parts.append(payload.decode())
                 elif content_type == "text/html":
                     payload = part.get_payload(decode=True)
                     assert isinstance(payload, bytes)  # type assertion for mypy
@@ -82,7 +83,10 @@ class EmailData:
         else:
             payload = msg.get_payload(decode=True)
             assert isinstance(payload, bytes)  # type assertion for mypy
-            body_text = payload.decode()
+            body_text_parts.append(payload.decode())
+
+        # Combine all text parts
+        body_text = "\n".join(part for part in body_text_parts if part.strip())
 
         return cls(
             message_id=msg["Message-ID"] or "",
