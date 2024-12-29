@@ -1,5 +1,6 @@
 """Email client implementation."""
 
+import asyncio
 import email
 import logging
 from email.message import EmailMessage
@@ -24,24 +25,14 @@ class EmailClient(BaseEmailClient):
         self._imap: Optional[aioimaplib.IMAP4_SSL] = None
         self._smtp: Optional[aiosmtplib.SMTP] = None
 
-    async def connect(self) -> None:
-        """Establish connections to IMAP and SMTP servers."""
-        # Connect to IMAP
-        self._imap = aioimaplib.IMAP4_SSL(
-            host=self.config.imap_server,
-            port=self.config.imap_port,
-            timeout=self.config.timeout,
-        )
-        await self._imap.wait_hello_from_server()
-        logger.debug(
-            "Connected to IMAP server %s:%s",
-            self.config.imap_server,
-            self.config.imap_port,
-        )
-        await self._imap.login(self.config.email, self.config.password)
-        logger.debug("Logged in to IMAP server as %s", self.config.email)
-        await self._imap.select(self.config.folder)
-        logger.debug("Selected IMAP folder: %s", self.config.folder)
+    async def _connect_smtp(self) -> None:
+        """Establish connection to SMTP server."""
+        if self._smtp:
+            try:
+                await self._smtp.quit()
+            except Exception:
+                pass
+            self._smtp = None
 
         # Connect to SMTP with appropriate security
         if self.config.smtp_port == 465:
@@ -78,6 +69,44 @@ class EmailClient(BaseEmailClient):
                 await self._smtp.starttls()
         await self._smtp.login(self.config.email, self.config.password)
         logger.debug("Logged in to SMTP server as %s", self.config.email)
+
+    async def _ensure_smtp_connection(self) -> None:
+        """Ensure SMTP connection is active and reconnect if needed."""
+        try:
+            if not self._smtp:
+                await self._connect_smtp()
+            else:
+                # Test connection with NOOP
+                try:
+                    await self._smtp.noop()
+                except Exception as e:
+                    logger.warning("SMTP connection lost, reconnecting: %s", e)
+                    await self._connect_smtp()
+        except Exception as e:
+            logger.error("Failed to ensure SMTP connection: %s", e)
+            raise
+
+    async def connect(self) -> None:
+        """Establish connections to IMAP and SMTP servers."""
+        # Connect to IMAP
+        self._imap = aioimaplib.IMAP4_SSL(
+            host=self.config.imap_server,
+            port=self.config.imap_port,
+            timeout=self.config.timeout,
+        )
+        await self._imap.wait_hello_from_server()
+        logger.debug(
+            "Connected to IMAP server %s:%s",
+            self.config.imap_server,
+            self.config.imap_port,
+        )
+        await self._imap.login(self.config.email, self.config.password)
+        logger.debug("Logged in to IMAP server as %s", self.config.email)
+        await self._imap.select(self.config.folder)
+        logger.debug("Selected IMAP folder: %s", self.config.folder)
+
+        # Connect to SMTP
+        await self._connect_smtp()
 
     async def disconnect(self) -> None:
         """Close connections to email servers."""
@@ -145,15 +174,43 @@ class EmailClient(BaseEmailClient):
             email_data = EmailData.from_email_message(email_message)
             yield email_data
 
-    async def send_message(self, message: EmailData) -> None:
-        """Send an email message via SMTP."""
-        if not self._smtp:
-            raise RuntimeError("Not connected to SMTP server")
+    async def send_message(self, message: EmailData, max_retries: int = 3) -> None:
+        """Send an email message via SMTP with automatic reconnection and retries.
 
-        logger.debug("Sending message to %s", ", ".join(message.to_addresses))
-        email_message = message.to_email_message()
-        await self._smtp.send_message(email_message)
-        logger.debug("Message sent successfully")
+        Args:
+            message: The email message to send
+            max_retries: Maximum number of retry attempts (default: 3)
+        """
+        retries = 0
+        last_error = None
+
+        while retries <= max_retries:
+            try:
+                await self._ensure_smtp_connection()
+                logger.debug("Sending message to %s", ", ".join(message.to_addresses))
+                email_message = message.to_email_message()
+                if self._smtp:
+                    await self._smtp.send_message(email_message)
+                logger.debug("Message sent successfully")
+                return
+            except Exception as e:
+                last_error = e
+                retries += 1
+                if retries <= max_retries:
+                    wait_time = min(
+                        2**retries, 30
+                    )  # Exponential backoff, max 30 seconds
+                    logger.warning(
+                        "Failed to send message (attempt %d/%d), retrying in %d seconds: %s",
+                        retries,
+                        max_retries,
+                        wait_time,
+                        e,
+                    )
+                    await asyncio.sleep(wait_time)
+
+        logger.error("Failed to send message after %d attempts", max_retries)
+        raise last_error or RuntimeError("Failed to send message")
 
     async def mark_as_read(self, message_id: str) -> None:
         """Mark a message as read using its Message-ID."""
