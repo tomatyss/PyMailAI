@@ -162,12 +162,62 @@ export EMAIL_ADDRESS="your-email@gmail.com"
 export EMAIL_PASSWORD="your-app-password"
 export EMAIL_IMAP_SERVER="imap.gmail.com"  # Optional, default: imap.gmail.com
 export EMAIL_SMTP_SERVER="smtp.gmail.com"  # Optional, default: smtp.gmail.com
+export EMAIL_IMAP_PORT="993"  # Optional, default: 993
+export EMAIL_SMTP_PORT="465"  # Optional, default: 465 (SSL/TLS) or 587 (STARTTLS)
+export EMAIL_CHECK_INTERVAL="60"  # Optional, seconds between inbox checks, default: 60
 
 # Your LLM API keys
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
 # ... other API keys as needed
 ```
+
+### Connection Handling
+
+PyMailAI includes robust connection handling features to maintain reliable email communication:
+
+1. **Automatic Reconnection**: The client automatically detects disconnections and reconnects when:
+   - SMTP server connection is lost
+   - Connection timeouts occur
+   - Network interruptions happen
+
+2. **Retry Logic**: Built-in retry mechanisms with exponential backoff for:
+   - Sending messages (max 3 retries)
+   - Marking messages as read (max 3 retries)
+   - Connection attempts
+
+3. **Error Recovery**: The agent gracefully handles various error scenarios:
+   - Connection drops
+   - Server timeouts
+   - Network issues
+   - Message processing failures
+
+Example with custom retry settings:
+
+```python
+from pymailai import EmailAgent, EmailConfig, EmailData
+
+# Configure email with custom settings
+config = EmailConfig(
+    email=os.getenv("EMAIL_ADDRESS"),
+    password=os.getenv("EMAIL_PASSWORD"),
+    check_interval=30,  # Check inbox every 30 seconds
+    timeout=30,  # Connection timeout in seconds
+)
+
+async def process_message(message: EmailData):
+    # Your message processing logic here
+    response = ...
+
+    # Send with custom retry settings
+    await agent._client.send_message(response, max_retries=5)  # Increase retries for important messages
+```
+
+For long-running applications, the agent automatically:
+- Maintains SMTP connection health
+- Recovers from disconnections
+- Implements backoff strategies to prevent server stress
+- Logs connection events for monitoring
 
 ## Documentation
 

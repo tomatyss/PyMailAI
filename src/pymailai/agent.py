@@ -56,7 +56,7 @@ class EmailAgent:
         return None
 
     async def _check_messages(self) -> None:
-        """Poll for new messages and process them."""
+        """Poll for new messages and process them with error handling and retries."""
         if not self._client:
             logger.error("Email client not initialized")
             return
@@ -64,44 +64,101 @@ class EmailAgent:
         try:
             # Process messages as they come in
             async for message in self._client.fetch_new_messages():
+                # Define max_retries at the start of message processing
+                max_retries = 3
+                response = None
+
                 try:
                     # Process the message
                     response = await self.process_message(message)
 
-                    # Mark original message as read
-                    await self._client.mark_as_read(message.message_id)
+                    # Mark original message as read with retries
+                    for attempt in range(max_retries):
+                        try:
+                            await self._client.mark_as_read(message.message_id)
+                            break
+                        except Exception as e:
+                            if attempt == max_retries - 1:
+                                logger.error(
+                                    f"Failed to mark message as read after {max_retries} attempts: {e}",  # noqa E501
+                                    exc_info=True,
+                                )
+                                raise
+                            wait_time = min(2**attempt, 30)
+                            logger.warning(
+                                f"Failed to mark message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
+                                f"retrying in {wait_time} seconds: {e}"
+                            )
+                            await asyncio.sleep(wait_time)
 
                     # Send response if one was generated
                     if response and self._client:
-                        await self._client.send_message(response)
+                        try:
+                            await self._client.send_message(response)
+                        except Exception as e:
+                            logger.error(f"Failed to send response: {e}", exc_info=True)
+                            # Don't retry here as send_message already has retry logic
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
-                    # Still mark as read to avoid reprocessing
+                    # Still mark as read to avoid reprocessing, with retries
                     if self._client:
-                        await self._client.mark_as_read(message.message_id)
+                        for attempt in range(max_retries):
+                            try:
+                                await self._client.mark_as_read(message.message_id)
+                                break
+                            except Exception as mark_err:
+                                if attempt == max_retries - 1:
+                                    logger.error(
+                                        f"Failed to mark errored message as read after {max_retries} attempts: {mark_err}",  # noqa E501
+                                        exc_info=True,
+                                    )
+                                    break
+                                wait_time = min(2**attempt, 30)
+                                logger.warning(
+                                    f"Failed to mark errored message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
+                                    f"retrying in {wait_time} seconds: {mark_err}"
+                                )
+                                await asyncio.sleep(wait_time)
 
         except Exception as e:
             logger.error(f"Error fetching messages: {e}", exc_info=True)
+            # Add delay before next fetch attempt to prevent rapid retries on persistent errors
+            await asyncio.sleep(5)
 
     async def _run(self) -> None:
-        """Run loop for the email agent."""
+        """Run loop for the email agent with connection management."""
         if not self._client and self.config:
             self._client = cast(BaseEmailClient, EmailClient(self.config))
 
-        try:
-            if not self._client:
-                raise RuntimeError("Email client not initialized")
+        while self._running:
+            try:
+                if not self._client:
+                    raise RuntimeError("Email client not initialized")
 
-            async with self._client:
-                while self._running:
-                    await self._check_messages()
-                    # Use config interval if available, otherwise default to 60 seconds
-                    await asyncio.sleep(
-                        self.config.check_interval if self.config else 60
-                    )
-        finally:
-            self._client = None
+                async with self._client:
+                    while self._running:
+                        try:
+                            await self._check_messages()
+                            # Use config interval if available, otherwise default to 60 seconds
+                            await asyncio.sleep(
+                                self.config.check_interval if self.config else 60
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error in message check loop: {e}", exc_info=True
+                            )
+                            # Add delay before retry to prevent rapid retries on persistent errors
+                            await asyncio.sleep(5)
+
+            except Exception as e:
+                logger.error(f"Connection error in agent run loop: {e}", exc_info=True)
+                if self._running:
+                    # Wait before attempting to reconnect
+                    await asyncio.sleep(10)
+                    continue
+            finally:
+                self._client = None
 
     async def start(self) -> None:
         """Start the email agent."""
