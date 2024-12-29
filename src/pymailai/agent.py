@@ -64,12 +64,15 @@ class EmailAgent:
         try:
             # Process messages as they come in
             async for message in self._client.fetch_new_messages():
+                # Define max_retries at the start of message processing
+                max_retries = 3
+                response = None
+
                 try:
                     # Process the message
                     response = await self.process_message(message)
 
                     # Mark original message as read with retries
-                    max_retries = 3
                     for attempt in range(max_retries):
                         try:
                             await self._client.mark_as_read(message.message_id)
