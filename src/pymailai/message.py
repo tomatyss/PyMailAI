@@ -134,52 +134,58 @@ class EmailData:
         Returns:
             The quoted text with attribution and '>' characters prepended to each line
         """
-        # Format the date to a readable string
-        date_str = self.timestamp.strftime("%b %d, %Y, at %I:%M %p")
-
-        # Create attribution line
-        attribution = f"On {date_str}, {self.from_address} wrote:"
-
-        # Format the quoted text with proper indentation
         prefix = ">" * level
-        quoted_lines = []
 
-        # Split text into lines and process each line
+        # Format the header block
+        header_lines = [
+            f"{prefix} -------- Original Message --------",
+            f"{prefix} Subject: {self.subject}",
+            f"{prefix} Date: {self.timestamp.strftime('%b %d, %Y, at %I:%M %p')}",
+            f"{prefix} From: {self.from_address}",
+            f"{prefix}",
+        ]
+
+        # Process the text content, handling various quote formats
+        quoted_lines = []
         lines = text.splitlines()
         i = 0
         while i < len(lines):
-            line = lines[i]
+            line = lines[i].rstrip()
 
-            # Check if this line starts an embedded quote
-            if (
-                line.startswith("On ")
-                and i + 1 < len(lines)
-                and lines[i + 1].startswith(">")
-            ):
-                # Found an embedded quote, preserve its structure but add our quote level
-                quoted_lines.append(f"{prefix} {line}")
-                i += 1
-                while i < len(lines) and (
-                    lines[i].startswith(">") or not lines[i].strip()
-                ):
-                    if lines[i].startswith(">"):
-                        # Add our quote level to the existing quote
-                        quoted_lines.append(f"{prefix}{lines[i]}")
-                    else:
-                        # Empty line within quote
-                        quoted_lines.append(prefix)
-                    i += 1
-                continue
+            # Detect various quote patterns
+            is_quote = any(
+                [
+                    line.lstrip().startswith(">"),  # Standard quote
+                    line.startswith("On ") and "wrote:" in line,  # Attribution line
+                    line.startswith("From:")
+                    and i > 0
+                    and lines[i - 1].startswith("----"),  # Header style
+                    line.startswith("Date:") and i > 0,  # Header style
+                    line.startswith("Subject:") and i > 0,  # Header style
+                ]
+            )
 
-            # Regular line
-            if line.strip():
-                quoted_lines.append(f"{prefix} {line}")
+            if is_quote:
+                # For existing quotes, preserve their structure but add our level
+                if line.lstrip().startswith(">"):
+                    # Count existing quote level
+                    existing_level = len(line) - len(line.lstrip())
+                    content = line[existing_level:].lstrip()
+                    # Add our quote level while preserving existing
+                    quoted_lines.append(f"{prefix}{'>' * existing_level} {content}")
+                else:
+                    # For other quote formats, add our quote level
+                    quoted_lines.append(f"{prefix} {line}")
             else:
-                quoted_lines.append(prefix)
+                # Regular line
+                if line.strip():
+                    quoted_lines.append(f"{prefix} {line}")
+                else:
+                    quoted_lines.append(prefix)
             i += 1
 
-        # Combine attribution with quoted text
-        return f"{attribution}\n{prefix}\n" + "\n".join(quoted_lines)
+        # Combine header and quoted content
+        return "\n".join(header_lines + quoted_lines)
 
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
