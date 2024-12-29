@@ -22,7 +22,10 @@ def test_format_quoted_text():
     # Test basic quotation
     quoted = email._format_quoted_text("Hello\nWorld", level=1)
     expected = (
-        "On Jan 01, 2024, at 02:30 PM, from@example.com wrote:\n"
+        "> -------- Original Message --------\n"
+        "> Subject: Test\n"
+        "> Date: Jan 01, 2024, at 02:30 PM\n"
+        "> From: from@example.com\n"
         ">\n"
         "> Hello\n"
         "> World"
@@ -32,7 +35,10 @@ def test_format_quoted_text():
     # Test multiple quotation levels
     quoted = email._format_quoted_text("Hello\nWorld", level=2)
     expected = (
-        "On Jan 01, 2024, at 02:30 PM, from@example.com wrote:\n"
+        ">> -------- Original Message --------\n"
+        ">> Subject: Test\n"
+        ">> Date: Jan 01, 2024, at 02:30 PM\n"
+        ">> From: from@example.com\n"
         ">>\n"
         ">> Hello\n"
         ">> World"
@@ -42,11 +48,46 @@ def test_format_quoted_text():
     # Test empty lines
     quoted = email._format_quoted_text("Hello\n\nWorld", level=1)
     expected = (
-        "On Jan 01, 2024, at 02:30 PM, from@example.com wrote:\n"
+        "> -------- Original Message --------\n"
+        "> Subject: Test\n"
+        "> Date: Jan 01, 2024, at 02:30 PM\n"
+        "> From: from@example.com\n"
         ">\n"
         "> Hello\n"
         ">\n"
         "> World"
+    )
+    assert quoted == expected
+
+    # Test handling of existing quotes
+    quoted = email._format_quoted_text(
+        "Hello\n> Existing quote\n>> Nested quote", level=1
+    )
+    expected = (
+        "> -------- Original Message --------\n"
+        "> Subject: Test\n"
+        "> Date: Jan 01, 2024, at 02:30 PM\n"
+        "> From: from@example.com\n"
+        ">\n"
+        "> Hello\n"
+        "> > Existing quote\n"
+        "> >> Nested quote"
+    )
+    assert quoted == expected
+
+    # Test handling of alternative quote formats
+    quoted = email._format_quoted_text(
+        "Hello\nOn Jan 1, 2024 someone@email.com wrote:\n> Previous text", level=1
+    )
+    expected = (
+        "> -------- Original Message --------\n"
+        "> Subject: Test\n"
+        "> Date: Jan 01, 2024, at 02:30 PM\n"
+        "> From: from@example.com\n"
+        ">\n"
+        "> Hello\n"
+        "> On Jan 1, 2024 someone@email.com wrote:\n"
+        "> > Previous text"
     )
     assert quoted == expected
 
@@ -74,7 +115,10 @@ def test_create_reply():
     # Check reply formatting (using regex to match since timestamp will vary)
     pattern = (
         r"Reply text\n\n"
-        r"On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, from@example\.com wrote:\n"
+        r"> -------- Original Message --------\n"
+        r"> Subject: Original Subject\n"
+        r"> Date: [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M\n"
+        r"> From: from@example\.com\n"
         r">\n"
         r"> Original message"
     )
@@ -113,13 +157,19 @@ def test_nested_reply_quotation():
     # Check nested reply formatting with regex
     pattern = (
         r"Second reply\n\n"
-        r"On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, bob@example\.com wrote:\n"
+        r"> -------- Original Message --------\n"
+        r"> Subject: Re: Original Subject\n"
+        r"> Date: [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M\n"
+        r"> From: bob@example\.com\n"
         r">\n"
         r"> First reply\n"
         r">\n"
-        r"> On [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M, alice@example\.com wrote:\n"
-        r">>\n"
-        r">> Original message"
+        r"> > -------- Original Message --------\n"
+        r"> > Subject: Original Subject\n"
+        r"> > Date: [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M\n"
+        r"> > From: alice@example\.com\n"
+        r"> >\n"
+        r"> > Original message"
     )
     assert re.match(pattern, reply2.body_text), f"Expected pattern not found in:\n{reply2.body_text}"
 
