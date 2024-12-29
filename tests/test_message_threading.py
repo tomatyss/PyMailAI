@@ -5,8 +5,8 @@ from datetime import datetime
 from pymailai.message import EmailData
 
 
-def test_format_quoted_text():
-    """Test that text is properly quoted with attribution and > characters."""
+def test_reply_format():
+    """Test that replies preserve the entire thread history."""
     timestamp = datetime(2024, 1, 1, 14, 30)  # Fixed timestamp for testing
     email = EmailData(
         message_id="test-id",
@@ -14,82 +14,25 @@ def test_format_quoted_text():
         from_address="from@example.com",
         to_addresses=["to@example.com"],
         cc_addresses=[],
-        body_text="Line 1\nLine 2\n\nLine 3",
+        body_text="Original message with\nmultiple lines\n\nand paragraphs",
         body_html=None,
         timestamp=timestamp
     )
 
-    # Test basic quotation
-    quoted = email._format_quoted_text("Hello\nWorld", level=1)
+    reply = email.create_reply("New reply text")
     expected = (
+        "New reply text\n\n"
         "> -------- Original Message --------\n"
         "> Subject: Test\n"
         "> Date: Jan 01, 2024, at 02:30 PM\n"
         "> From: from@example.com\n"
         ">\n"
-        "> Hello\n"
-        "> World"
-    )
-    assert quoted == expected
-
-    # Test multiple quotation levels
-    quoted = email._format_quoted_text("Hello\nWorld", level=2)
-    expected = (
-        ">> -------- Original Message --------\n"
-        ">> Subject: Test\n"
-        ">> Date: Jan 01, 2024, at 02:30 PM\n"
-        ">> From: from@example.com\n"
-        ">>\n"
-        ">> Hello\n"
-        ">> World"
-    )
-    assert quoted == expected
-
-    # Test empty lines
-    quoted = email._format_quoted_text("Hello\n\nWorld", level=1)
-    expected = (
-        "> -------- Original Message --------\n"
-        "> Subject: Test\n"
-        "> Date: Jan 01, 2024, at 02:30 PM\n"
-        "> From: from@example.com\n"
+        "> Original message with\n"
+        "> multiple lines\n"
         ">\n"
-        "> Hello\n"
-        ">\n"
-        "> World"
+        "> and paragraphs"
     )
-    assert quoted == expected
-
-    # Test handling of existing quotes
-    quoted = email._format_quoted_text(
-        "Hello\n> Existing quote\n>> Nested quote", level=1
-    )
-    expected = (
-        "> -------- Original Message --------\n"
-        "> Subject: Test\n"
-        "> Date: Jan 01, 2024, at 02:30 PM\n"
-        "> From: from@example.com\n"
-        ">\n"
-        "> Hello\n"
-        "> > Existing quote\n"
-        "> >> Nested quote"
-    )
-    assert quoted == expected
-
-    # Test handling of alternative quote formats
-    quoted = email._format_quoted_text(
-        "Hello\nOn Jan 1, 2024 someone@email.com wrote:\n> Previous text", level=1
-    )
-    expected = (
-        "> -------- Original Message --------\n"
-        "> Subject: Test\n"
-        "> Date: Jan 01, 2024, at 02:30 PM\n"
-        "> From: from@example.com\n"
-        ">\n"
-        "> Hello\n"
-        "> On Jan 1, 2024 someone@email.com wrote:\n"
-        "> > Previous text"
-    )
-    assert quoted == expected
+    assert reply.body_text == expected
 
 
 def test_create_reply():
@@ -130,9 +73,9 @@ def test_create_reply():
     assert reply.cc_addresses == ["cc@example.com"]  # Preserves CC
 
 
-def test_nested_reply_quotation():
-    """Test increasing quotation levels in nested replies."""
-    # Original message with fixed timestamp
+def test_nested_reply_threading():
+    """Test that nested replies preserve the entire conversation history."""
+    # Original message
     original = EmailData(
         message_id="original-id",
         subject="Original Subject",
@@ -144,34 +87,34 @@ def test_nested_reply_quotation():
         timestamp=datetime(2024, 1, 1, 14, 30)  # Fixed timestamp
     )
 
-    # First reply (with proper from_address and fixed timestamp)
+    # First reply
     reply1 = original.create_reply("First reply")
-    reply1.from_address = "bob@example.com"  # Set the sender
-    reply1.timestamp = datetime(2024, 1, 1, 14, 35)  # 5 minutes after original
+    reply1.from_address = "bob@example.com"
+    reply1.timestamp = datetime(2024, 1, 1, 14, 35)
 
-    # Second reply (to the first reply)
+    # Second reply
     reply2 = reply1.create_reply("Second reply")
-    reply2.from_address = "alice@example.com"  # Set the sender
-    reply2.timestamp = datetime(2024, 1, 1, 14, 40)  # 5 minutes after reply1
+    reply2.from_address = "alice@example.com"
+    reply2.timestamp = datetime(2024, 1, 1, 14, 40)
 
-    # Check nested reply formatting with regex
-    pattern = (
-        r"Second reply\n\n"
-        r"> -------- Original Message --------\n"
-        r"> Subject: Re: Original Subject\n"
-        r"> Date: [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M\n"
-        r"> From: bob@example\.com\n"
-        r">\n"
-        r"> First reply\n"
-        r">\n"
-        r"> > -------- Original Message --------\n"
-        r"> > Subject: Original Subject\n"
-        r"> > Date: [A-Z][a-z]{2} \d{2}, \d{4}, at \d{2}:\d{2} [AP]M\n"
-        r"> > From: alice@example\.com\n"
-        r"> >\n"
-        r"> > Original message"
+    # Verify the complete thread is preserved
+    expected = (
+        "Second reply\n\n"
+        "> -------- Original Message --------\n"
+        "> Subject: Re: Original Subject\n"
+        "> Date: Jan 01, 2024, at 02:35 PM\n"
+        "> From: bob@example.com\n"
+        ">\n"
+        "> First reply\n"
+        ">\n"
+        "> > -------- Original Message --------\n"
+        "> > Subject: Original Subject\n"
+        "> > Date: Jan 01, 2024, at 02:30 PM\n"
+        "> > From: alice@example.com\n"
+        "> >\n"
+        "> > Original message"
     )
-    assert re.match(pattern, reply2.body_text), f"Expected pattern not found in:\n{reply2.body_text}"
+    assert reply2.body_text == expected
 
 
 def test_reply_without_history():
@@ -195,3 +138,54 @@ def test_reply_without_history():
     # But threading metadata is still preserved
     assert reply.in_reply_to == "original-id"
     assert reply.references == ["original-id"]
+
+
+def test_preserve_thread_history():
+    """Test preservation of complete email thread history."""
+    # Original message
+    original = EmailData(
+        message_id="msg1",
+        subject="Original Subject",
+        from_address="alice@example.com",
+        to_addresses=["bob@example.com"],
+        cc_addresses=[],
+        body_text="First message",
+        body_html=None,
+        timestamp=datetime(2024, 1, 1, 14, 30)
+    )
+
+    # First reply with quoted original
+    reply1 = original.create_reply("Second message")
+    reply1.message_id = "msg2"
+    reply1.from_address = "bob@example.com"
+    reply1.timestamp = datetime(2024, 1, 1, 14, 35)
+
+    # Second reply should preserve both previous messages
+    reply2 = reply1.create_reply("Third message")
+    reply2.message_id = "msg3"
+    reply2.from_address = "alice@example.com"
+    reply2.timestamp = datetime(2024, 1, 1, 14, 40)
+
+    # Verify the complete thread is preserved
+    expected_pattern = (
+        r"Third message\n\n"
+        r"> -------- Original Message --------\n"
+        r"> Subject: Re: Original Subject\n"
+        r"> Date: Jan 01, 2024, at 02:35 PM\n"
+        r"> From: bob@example\.com\n"
+        r">\n"
+        r"> Second message\n"
+        r">\n"
+        r"> > -------- Original Message --------\n"
+        r"> > Subject: Original Subject\n"
+        r"> > Date: Jan 01, 2024, at 02:30 PM\n"
+        r"> > From: alice@example\.com\n"
+        r"> >\n"
+        r"> > First message"
+    )
+
+    assert re.match(expected_pattern, reply2.body_text), f"Expected pattern not found in:\n{reply2.body_text}"
+
+    # Verify threading metadata
+    assert reply2.in_reply_to == "msg2"
+    assert reply2.references == ["msg1", "msg2"]

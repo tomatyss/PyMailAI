@@ -124,69 +124,6 @@ class EmailData:
         parsed = utils.parsedate_tz(date_str)
         return parsed if parsed is not None else default_tuple
 
-    def _format_quoted_text(self, text: str, level: int = 1) -> str:
-        """Format text with email-style quotation marks and attribution.
-
-        Args:
-            text: The text to quote
-            level: The quotation level (number of '>' characters to prepend)
-
-        Returns:
-            The quoted text with attribution and '>' characters prepended to each line
-        """
-        prefix = ">" * level
-
-        # Format the header block
-        header_lines = [
-            f"{prefix} -------- Original Message --------",
-            f"{prefix} Subject: {self.subject}",
-            f"{prefix} Date: {self.timestamp.strftime('%b %d, %Y, at %I:%M %p')}",
-            f"{prefix} From: {self.from_address}",
-            f"{prefix}",
-        ]
-
-        # Process the text content, handling various quote formats
-        quoted_lines = []
-        lines = text.splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].rstrip()
-
-            # Detect various quote patterns
-            is_quote = any(
-                [
-                    line.lstrip().startswith(">"),  # Standard quote
-                    line.startswith("On ") and "wrote:" in line,  # Attribution line
-                    line.startswith("From:")
-                    and i > 0
-                    and lines[i - 1].startswith("----"),  # Header style
-                    line.startswith("Date:") and i > 0,  # Header style
-                    line.startswith("Subject:") and i > 0,  # Header style
-                ]
-            )
-
-            if is_quote:
-                # For existing quotes, preserve their structure but add our level
-                if line.lstrip().startswith(">"):
-                    # Count existing quote level
-                    existing_level = len(line) - len(line.lstrip())
-                    content = line[existing_level:].lstrip()
-                    # Add our quote level while preserving existing
-                    quoted_lines.append(f"{prefix}{'>' * existing_level} {content}")
-                else:
-                    # For other quote formats, add our quote level
-                    quoted_lines.append(f"{prefix} {line}")
-            else:
-                # Regular line
-                if line.strip():
-                    quoted_lines.append(f"{prefix} {line}")
-                else:
-                    quoted_lines.append(prefix)
-            i += 1
-
-        # Combine header and quoted content
-        return "\n".join(header_lines + quoted_lines)
-
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
     ) -> "EmailData":
@@ -218,8 +155,28 @@ class EmailData:
         # Format body text with quotations if including history
         body_text = reply_text
         if include_history:
-            quoted = self._format_quoted_text(self.body_text, quote_level)
-            body_text = f"{reply_text}\n\n{quoted}"
+            # Add the original message with proper quoting
+            prefix = ">" * quote_level
+            quoted_lines = [
+                "",  # Empty line before quote
+                "",  # Empty line before quote
+                f"{prefix} -------- Original Message --------",
+                f"{prefix} Subject: {self.subject}",
+                f"{prefix} Date: {self.timestamp.strftime('%b %d, %Y, at %I:%M %p')}",
+                f"{prefix} From: {self.from_address}",
+                prefix,  # Empty quoted line after header
+            ]
+
+            # Add quoted message body, preserving existing quote levels
+            for line in self.body_text.splitlines():
+                if line.startswith(">"):
+                    # Line is already quoted, add our quote level
+                    quoted_lines.append(f"{prefix} {line}")
+                else:
+                    # New line to quote
+                    quoted_lines.append(f"{prefix} {line}" if line.strip() else prefix)
+
+            body_text = reply_text + "\n".join(quoted_lines)
 
         # Create reply email data
         return EmailData(
