@@ -195,3 +195,54 @@ def test_reply_without_history():
     # But threading metadata is still preserved
     assert reply.in_reply_to == "original-id"
     assert reply.references == ["original-id"]
+
+
+def test_preserve_thread_history():
+    """Test preservation of complete email thread history."""
+    # Original message
+    original = EmailData(
+        message_id="msg1",
+        subject="Original Subject",
+        from_address="alice@example.com",
+        to_addresses=["bob@example.com"],
+        cc_addresses=[],
+        body_text="First message",
+        body_html=None,
+        timestamp=datetime(2024, 1, 1, 14, 30)
+    )
+
+    # First reply with quoted original
+    reply1 = original.create_reply("Second message")
+    reply1.message_id = "msg2"
+    reply1.from_address = "bob@example.com"
+    reply1.timestamp = datetime(2024, 1, 1, 14, 35)
+
+    # Second reply should preserve both previous messages
+    reply2 = reply1.create_reply("Third message")
+    reply2.message_id = "msg3"
+    reply2.from_address = "alice@example.com"
+    reply2.timestamp = datetime(2024, 1, 1, 14, 40)
+
+    # Verify the complete thread is preserved
+    expected_pattern = (
+        r"Third message\n\n"
+        r"> -------- Original Message --------\n"
+        r"> Subject: Re: Original Subject\n"
+        r"> Date: Jan 01, 2024, at 02:35 PM\n"
+        r"> From: bob@example\.com\n"
+        r">\n"
+        r"> Second message\n"
+        r">\n"
+        r"> > -------- Original Message --------\n"
+        r"> > Subject: Original Subject\n"
+        r"> > Date: Jan 01, 2024, at 02:30 PM\n"
+        r"> > From: alice@example\.com\n"
+        r"> >\n"
+        r"> > First message"
+    )
+
+    assert re.match(expected_pattern, reply2.body_text), f"Expected pattern not found in:\n{reply2.body_text}"
+
+    # Verify threading metadata
+    assert reply2.in_reply_to == "msg2"
+    assert reply2.references == ["msg1", "msg2"]
