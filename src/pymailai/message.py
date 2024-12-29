@@ -4,17 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from email import utils
 from email.message import EmailMessage
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pymailai.markdown_converter import MarkdownConverter
-
-
-class QuoteSection(TypedDict):
-    """Type definition for a quoted section in an email."""
-
-    header: str
-    content: List[str]
-    level: int
 
 
 @dataclass
@@ -132,104 +124,6 @@ class EmailData:
         parsed = utils.parsedate_tz(date_str)
         return parsed if parsed is not None else default_tuple
 
-    def _extract_quoted_sections(self, text: str) -> List[QuoteSection]:
-        """Extract quoted sections from email text.
-
-        Args:
-            text: The email text to process
-
-        Returns:
-            List of dicts containing quote metadata and content
-        """
-        sections: List[QuoteSection] = []
-        current_section = QuoteSection(header="", content=[], level=0)
-        lines = text.splitlines()
-        i = 0
-
-        while i < len(lines):
-            line = lines[i].rstrip()
-
-            # Detect start of quoted section
-            if line.startswith("-------- Original Message --------"):
-                if current_section["content"]:
-                    sections.append(current_section)
-                current_section = QuoteSection(header=line, content=[], level=0)
-                # Extract quote header
-                while i < len(lines) and not lines[i].strip() == "":
-                    current_section[
-                        "header"
-                    ] = f"{current_section['header']}\n{lines[i]}"
-                    i += 1
-            # Handle quoted lines
-            elif line.lstrip().startswith(">"):
-                indent = len(line) - len(line.lstrip())
-                current_section["level"] = max(current_section["level"], indent)
-                current_section["content"].append(line)
-            # Regular content
-            else:
-                current_section["content"].append(line)
-            i += 1
-
-        if current_section["content"]:
-            sections.append(current_section)
-
-        return sections
-
-    def _format_quoted_text(self, text: str, level: int = 1) -> str:
-        """Format text with email-style quotation marks and attribution.
-
-        Args:
-            text: The text to quote
-            level: The quotation level (number of '>' characters to prepend)
-
-        Returns:
-            The quoted text with attribution and '>' characters prepended to each line
-        """
-        # Format the current message header
-        prefix = ">" * level
-        header_lines = [
-            f"{prefix} -------- Original Message --------",
-            f"{prefix} Subject: {self.subject}",
-            f"{prefix} Date: {self.timestamp.strftime('%b %d, %Y, at %I:%M %p')}",
-            f"{prefix} From: {self.from_address}",
-            f"{prefix}",
-        ]
-
-        # Extract and process quoted sections
-        sections = self._extract_quoted_sections(text)
-        quoted_lines = []
-
-        # Process each section
-        for section in sections:
-            if section["header"]:
-                # This is a quoted section, preserve its structure with increased level
-                quoted_level = level + section["level"]
-                section_prefix = ">" * quoted_level
-                # Add the preserved header with proper indentation
-                header_lines = [
-                    f"{section_prefix} {line}"
-                    for line in section["header"].splitlines()
-                ]
-                quoted_lines.extend(header_lines)
-                quoted_lines.append(section_prefix)
-
-            # Process content lines
-            for line in section["content"]:
-                if line.lstrip().startswith(">"):
-                    # Preserve existing quote structure
-                    existing_level = len(line) - len(line.lstrip())
-                    content = line[existing_level:].lstrip()
-                    quoted_lines.append(f"{prefix}{'>' * existing_level} {content}")
-                else:
-                    # Regular line
-                    if line.strip():
-                        quoted_lines.append(f"{prefix} {line}")
-                    else:
-                        quoted_lines.append(prefix)
-
-        # Combine all parts
-        return "\n".join(header_lines + quoted_lines)
-
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
     ) -> "EmailData":
@@ -261,8 +155,28 @@ class EmailData:
         # Format body text with quotations if including history
         body_text = reply_text
         if include_history:
-            quoted = self._format_quoted_text(self.body_text, quote_level)
-            body_text = f"{reply_text}\n\n{quoted}"
+            # Add the original message with proper quoting
+            prefix = ">" * quote_level
+            quoted_lines = [
+                "",  # Empty line before quote
+                "",  # Empty line before quote
+                f"{prefix} -------- Original Message --------",
+                f"{prefix} Subject: {self.subject}",
+                f"{prefix} Date: {self.timestamp.strftime('%b %d, %Y, at %I:%M %p')}",
+                f"{prefix} From: {self.from_address}",
+                prefix,  # Empty quoted line after header
+            ]
+
+            # Add quoted message body, preserving existing quote levels
+            for line in self.body_text.splitlines():
+                if line.startswith(">"):
+                    # Line is already quoted, add our quote level
+                    quoted_lines.append(f"{prefix} {line}")
+                else:
+                    # New line to quote
+                    quoted_lines.append(f"{prefix} {line}" if line.strip() else prefix)
+
+            body_text = reply_text + "\n".join(quoted_lines)
 
         # Create reply email data
         return EmailData(
