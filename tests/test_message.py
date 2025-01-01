@@ -467,4 +467,5 @@ def test_create_reply_chain():
     # Third reply
     reply3 = reply2.create_reply("Third reply")
     reply3.message_id = "<reply3@example.com>"  # Simulate server setting message ID
-    assert reply3.references == ["<original@example.com>", "<reply1@example.com>", "<reply2@example.com>"]
+    assert reply3.references == ["<original@example.com>",
+                                 "<reply1@example.com>", "<reply2@example.com>"]
