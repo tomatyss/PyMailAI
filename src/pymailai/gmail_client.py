@@ -185,7 +185,11 @@ class GmailClient(BaseEmailClient):
                         body_text=body_text or "",
                         body_html=body_html,
                         timestamp=timestamp,
-                        references=headers.get("References", ""),
+                        references=[
+                            ref.strip()
+                            for ref in headers.get("References", "").split()
+                            if ref.strip()
+                        ],
                         in_reply_to=headers.get("In-Reply-To", ""),
                     )
                     yield email_data
