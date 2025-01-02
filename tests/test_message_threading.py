@@ -33,6 +33,9 @@ def test_reply_format():
         "> and paragraphs"
     )
     assert reply.body_text == expected
+    # Verify from/to addresses are correctly swapped
+    assert reply.from_address == "to@example.com"  # Bot's address
+    assert reply.to_addresses == ["from@example.com"]  # Original sender
 
 
 def test_create_reply():
@@ -69,6 +72,7 @@ def test_create_reply():
 
     # Check other fields
     assert reply.subject == "Re: Original Subject"
+    assert reply.from_address == "to@example.com"  # Bot's address
     assert reply.to_addresses == ["from@example.com"]  # Reply goes to original sender
     assert reply.cc_addresses == ["cc@example.com"]  # Preserves CC
 
@@ -80,22 +84,37 @@ def test_nested_reply_threading():
         message_id="original-id",
         subject="Original Subject",
         from_address="alice@example.com",
-        to_addresses=["bob@example.com"],
+        to_addresses=["bot@example.com"],
         cc_addresses=[],
         body_text="Original message",
         body_html=None,
         timestamp=datetime(2024, 1, 1, 14, 30)  # Fixed timestamp
     )
 
-    # First reply
+    # First reply (from bot to alice)
     reply1 = original.create_reply("First reply")
-    reply1.from_address = "bob@example.com"
     reply1.timestamp = datetime(2024, 1, 1, 14, 35)
+    assert reply1.from_address == "bot@example.com"
+    assert reply1.to_addresses == ["alice@example.com"]
 
-    # Second reply
-    reply2 = reply1.create_reply("Second reply")
-    reply2.from_address = "alice@example.com"
+    # Second reply (from alice back to bot)
+    reply1_from_alice = EmailData(
+        message_id="reply1-id",
+        subject="Re: Original Subject",
+        from_address="alice@example.com",
+        to_addresses=["bot@example.com"],
+        cc_addresses=[],
+        body_text=reply1.body_text,
+        timestamp=datetime(2024, 1, 1, 14, 35),
+        references=reply1.references,
+        in_reply_to=reply1.message_id
+    )
+
+    # Bot's second reply
+    reply2 = reply1_from_alice.create_reply("Second reply")
     reply2.timestamp = datetime(2024, 1, 1, 14, 40)
+    assert reply2.from_address == "bot@example.com"
+    assert reply2.to_addresses == ["alice@example.com"]
 
     # Verify the complete thread is preserved
     expected = (
@@ -103,7 +122,7 @@ def test_nested_reply_threading():
         "> -------- Original Message --------\n"
         "> Subject: Re: Original Subject\n"
         "> Date: Jan 01, 2024, at 02:35 PM\n"
-        "> From: bob@example.com\n"
+        "> From: alice@example.com\n"
         ">\n"
         "> First reply\n"
         ">\n"
@@ -123,7 +142,7 @@ def test_reply_without_history():
         message_id="original-id",
         subject="Original Subject",
         from_address="from@example.com",
-        to_addresses=["to@example.com"],
+        to_addresses=["bot@example.com"],
         cc_addresses=[],
         body_text="Original message",
         body_html=None,
@@ -134,8 +153,10 @@ def test_reply_without_history():
 
     # Check that only reply text is included
     assert reply.body_text == "Reply text"
-
-    # But threading metadata is still preserved
+    # Check from/to addresses
+    assert reply.from_address == "bot@example.com"
+    assert reply.to_addresses == ["from@example.com"]
+    # Check threading metadata is still preserved
     assert reply.in_reply_to == "original-id"
     assert reply.references == ["original-id"]
 
@@ -147,24 +168,39 @@ def test_preserve_thread_history():
         message_id="msg1",
         subject="Original Subject",
         from_address="alice@example.com",
-        to_addresses=["bob@example.com"],
+        to_addresses=["bot@example.com"],
         cc_addresses=[],
         body_text="First message",
         body_html=None,
         timestamp=datetime(2024, 1, 1, 14, 30)
     )
 
-    # First reply with quoted original
+    # First reply from bot
     reply1 = original.create_reply("Second message")
     reply1.message_id = "msg2"
-    reply1.from_address = "bob@example.com"
     reply1.timestamp = datetime(2024, 1, 1, 14, 35)
+    assert reply1.from_address == "bot@example.com"
+    assert reply1.to_addresses == ["alice@example.com"]
 
-    # Second reply should preserve both previous messages
-    reply2 = reply1.create_reply("Third message")
+    # Simulate alice's reply to bot
+    reply1_from_alice = EmailData(
+        message_id="msg2",
+        subject="Re: Original Subject",
+        from_address="alice@example.com",
+        to_addresses=["bot@example.com"],
+        cc_addresses=[],
+        body_text=reply1.body_text,
+        timestamp=datetime(2024, 1, 1, 14, 35),
+        references=reply1.references,
+        in_reply_to=reply1.message_id
+    )
+
+    # Bot's second reply
+    reply2 = reply1_from_alice.create_reply("Third message")
     reply2.message_id = "msg3"
-    reply2.from_address = "alice@example.com"
     reply2.timestamp = datetime(2024, 1, 1, 14, 40)
+    assert reply2.from_address == "bot@example.com"
+    assert reply2.to_addresses == ["alice@example.com"]
 
     # Verify the complete thread is preserved
     expected_pattern = (
@@ -172,7 +208,7 @@ def test_preserve_thread_history():
         r"> -------- Original Message --------\n"
         r"> Subject: Re: Original Subject\n"
         r"> Date: Jan 01, 2024, at 02:35 PM\n"
-        r"> From: bob@example\.com\n"
+        r"> From: alice@example\.com\n"
         r">\n"
         r"> Second message\n"
         r">\n"
@@ -189,3 +225,23 @@ def test_preserve_thread_history():
     # Verify threading metadata
     assert reply2.in_reply_to == "msg2"
     assert reply2.references == ["msg1", "msg2"]
+
+
+def test_reply_no_recipients():
+    """Test that replying to a message with no recipients raises an error."""
+    email = EmailData(
+        message_id="test-id",
+        subject="Test",
+        from_address="from@example.com",
+        to_addresses=[],  # Empty recipients list
+        cc_addresses=[],
+        body_text="Test message",
+        body_html=None,
+        timestamp=datetime.now()
+    )
+
+    try:
+        email.create_reply("Reply text")
+        assert False, "Expected ValueError for message with no recipients"
+    except ValueError as e:
+        assert str(e) == "Cannot create reply: original message has no recipients"
