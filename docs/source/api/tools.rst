@@ -13,14 +13,14 @@ Tool Schemas
    :return: A dictionary containing the tool schema
    :rtype: dict
 
-   Example usage:
+   Example usage with Gmail:
 
    .. code-block:: python
 
       from pymailai.gmail import create_gmail_client
       from pymailai.tools import get_email_tool_schema_anthropic, execute_send_email
 
-      # 1. Initialize email client
+      # 1. Initialize Gmail client
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
@@ -45,6 +45,47 @@ Tool Schemas
               )
               print(f"Email send result: {result}")
 
+   Example usage with IMAP/SMTP:
+
+   .. code-block:: python
+
+      from pymailai.config import EmailConfig
+      from pymailai.client import EmailClient
+      from pymailai.tools import get_email_tool_schema_anthropic, execute_send_email
+
+      # 1. Initialize IMAP/SMTP client
+      config = EmailConfig(
+          email="your-email@example.com",
+          password="your-password",
+          imap_server="imap.example.com",
+          smtp_server="smtp.example.com",
+          imap_port=993,  # Default SSL/TLS port
+          smtp_port=465,  # Default SSL/TLS port
+      )
+      email_client = EmailClient(config)
+
+      # 2. Set up tool schema
+      tools = [get_email_tool_schema_anthropic()]
+
+      # 3. Make API call with tool
+      response = await client.messages.create(
+          model="claude-3-opus-20240229",
+          tools=tools,
+          messages=[{"role": "user", "content": "Send an email..."}]
+      )
+
+      # 4. Execute tool calls from response
+      for tool_call in response.content[0].tool_calls or []:
+          if tool_call.name == "send_email":
+              result = await execute_send_email(
+                  email_client,
+                  to=tool_call.parameters["to"],
+                  subject=tool_call.parameters["subject"],
+                  body=tool_call.parameters["body"],
+                  cc=tool_call.parameters.get("cc"),
+              )
+              print(f"Email send result: {result}")
+
 .. py:function:: get_email_tool_schema_openai()
 
    Get the email tool schema formatted for OpenAI GPT models.
@@ -52,14 +93,14 @@ Tool Schemas
    :return: A dictionary containing the tool schema
    :rtype: dict
 
-   Example usage:
+   Example usage with Gmail:
 
    .. code-block:: python
 
       from pymailai.gmail import create_gmail_client
       from pymailai.tools import get_email_tool_schema_openai, execute_send_email
 
-      # 1. Initialize email client
+      # 1. Initialize Gmail client
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
@@ -84,6 +125,25 @@ Tool Schemas
               )
               print(f"Email send result: {result}")
 
+   Example usage with IMAP/SMTP:
+
+   .. code-block:: python
+
+      from pymailai.config import EmailConfig
+      from pymailai.client import EmailClient
+      from pymailai.tools import get_email_tool_schema_openai, execute_send_email
+
+      # 1. Initialize IMAP/SMTP client
+      config = EmailConfig(
+          email="your-email@example.com",
+          password="your-password",
+          imap_server="imap.example.com",
+          smtp_server="smtp.example.com",
+      )
+      email_client = EmailClient(config)
+
+      # Rest of the code is the same as Gmail example...
+
 .. py:function:: get_email_tool_schema_ollama()
 
    Get the email tool schema formatted for Ollama models.
@@ -91,14 +151,14 @@ Tool Schemas
    :return: A dictionary containing the tool schema
    :rtype: dict
 
-   Example usage:
+   Example usage with Gmail:
 
    .. code-block:: python
 
       from pymailai.gmail import create_gmail_client
       from pymailai.tools import get_email_tool_schema_ollama, execute_send_email
 
-      # 1. Initialize email client
+      # 1. Initialize Gmail client
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
@@ -123,6 +183,25 @@ Tool Schemas
               )
               print(f"Email send result: {result}")
 
+   Example usage with IMAP/SMTP:
+
+   .. code-block:: python
+
+      from pymailai.config import EmailConfig
+      from pymailai.client import EmailClient
+      from pymailai.tools import get_email_tool_schema_ollama, execute_send_email
+
+      # 1. Initialize IMAP/SMTP client
+      config = EmailConfig(
+          email="your-email@example.com",
+          password="your-password",
+          imap_server="imap.example.com",
+          smtp_server="smtp.example.com",
+      )
+      email_client = EmailClient(config)
+
+      # Rest of the code is the same as Gmail example...
+
 Tool Execution
 -------------
 
@@ -143,7 +222,7 @@ Tool Execution
    :return: Dictionary containing success status and any error message
    :rtype: Dict[str, Union[bool, str]]
 
-   Example usage:
+   Example usage with Gmail:
 
    .. code-block:: python
 
@@ -163,14 +242,60 @@ Tool Execution
       )
       print(f"Email send result: {result}")
 
+   Example usage with IMAP/SMTP:
+
+   .. code-block:: python
+
+      from pymailai.tools import execute_send_email
+      from pymailai.config import EmailConfig
+      from pymailai.client import EmailClient
+
+      # Initialize IMAP/SMTP client
+      config = EmailConfig(
+          email="your-email@example.com",
+          password="your-password",
+          imap_server="imap.example.com",
+          smtp_server="smtp.example.com",
+      )
+      email_client = EmailClient(config)
+
+      # Send email
+      result = await execute_send_email(
+          email_client,
+          to=["recipient@example.com"],
+          subject="Test Email",
+          body="Hello from PyMailAI!",
+          cc=["cc@example.com"]
+      )
+      print(f"Email send result: {result}")
+
 Using the Email Tool
 ----------------
 
 The process of using the email tool involves four main steps:
 
 1. Initialize the Email Client:
-   - Use create_gmail_client() or your preferred email client
-   - This provides the mechanism for actually sending emails
+   You can use either Gmail API or standard IMAP/SMTP:
+
+   Gmail API:
+   .. code-block:: python
+
+      from pymailai.gmail import create_gmail_client
+      gmail = await create_gmail_client()
+
+   IMAP/SMTP:
+   .. code-block:: python
+
+      from pymailai.config import EmailConfig
+      from pymailai.client import EmailClient
+
+      config = EmailConfig(
+          email="your-email@example.com",
+          password="your-password",
+          imap_server="imap.example.com",
+          smtp_server="smtp.example.com",
+      )
+      email_client = EmailClient(config)
 
 2. Set up the Tool Schema:
    - Choose the appropriate schema for your AI model
