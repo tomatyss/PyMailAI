@@ -310,6 +310,71 @@ The agent will monitor the specified email account and:
 2. Send the email content to the local Ollama instance
 3. Send back the AI-generated response to the original sender
 
+Email Tool Integration
+-------------------
+
+This example shows how to use the email sending tool with AI models like Anthropic's Claude and OpenAI's GPT.
+
+.. literalinclude:: ../../examples/email_tool_example.py
+   :language: python
+   :caption: Email Tool Integration Example
+   :name: email_tool_example
+   :linenos:
+
+Key features of the email tool:
+
+- Support for Anthropic, OpenAI, and Ollama models
+- Markdown formatting support in email body
+- Optional CC recipients
+- Proper error handling and response tracking
+
+To run this example:
+
+1. Install the required dependencies:
+
+   .. code-block:: bash
+
+      pip install pymailai[anthropic,openai]
+
+2. Set up the required environment variables and dependencies:
+
+   .. code-block:: bash
+
+      # For Anthropic example
+      export ANTHROPIC_API_KEY="your-anthropic-api-key"
+
+      # For OpenAI example
+      export OPENAI_API_KEY="your-openai-api-key"
+
+      # For Ollama example
+      # Install Ollama from https://ollama.ai
+      ollama pull llama3.1  # Pull the model you want to use
+
+      # Gmail credentials (see Gmail Authentication section)
+      export GMAIL_CLIENT_ID="your-client-id"
+      export GMAIL_CLIENT_SECRET="your-client-secret"
+      export GMAIL_REFRESH_TOKEN="your-refresh-token"
+      export GMAIL_ADDRESS="your-gmail@gmail.com"
+
+3. Run the example(s):
+
+   .. code-block:: bash
+
+      # Run Anthropic example (default)
+      python examples/email_tool_example.py
+
+      # Or run OpenAI example
+      # Modify email_tool_example.py to use example_openai()
+
+      # Or run Ollama example
+      # Modify email_tool_example.py to use example_ollama()
+
+The example demonstrates:
+
+1. Setting up email tool schemas for AI models
+2. Processing tool calls from AI responses
+3. Executing email sending with proper error handling
+
 Simple AI Agent
 --------------
 
