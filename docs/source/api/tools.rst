@@ -17,14 +17,33 @@ Tool Schemas
 
    .. code-block:: python
 
-      from pymailai.tools import get_email_tool_schema_anthropic
+      from pymailai.gmail import create_gmail_client
+      from pymailai.tools import get_email_tool_schema_anthropic, execute_send_email
 
+      # 1. Initialize email client
+      gmail = await create_gmail_client()
+
+      # 2. Set up tool schema
       tools = [get_email_tool_schema_anthropic()]
+
+      # 3. Make API call with tool
       response = await client.messages.create(
           model="claude-3-opus-20240229",
           tools=tools,
           messages=[{"role": "user", "content": "Send an email..."}]
       )
+
+      # 4. Execute tool calls from response
+      for tool_call in response.content[0].tool_calls or []:
+          if tool_call.name == "send_email":
+              result = await execute_send_email(
+                  gmail,
+                  to=tool_call.parameters["to"],
+                  subject=tool_call.parameters["subject"],
+                  body=tool_call.parameters["body"],
+                  cc=tool_call.parameters.get("cc"),
+              )
+              print(f"Email send result: {result}")
 
 .. py:function:: get_email_tool_schema_openai()
 
@@ -37,14 +56,33 @@ Tool Schemas
 
    .. code-block:: python
 
-      from pymailai.tools import get_email_tool_schema_openai
+      from pymailai.gmail import create_gmail_client
+      from pymailai.tools import get_email_tool_schema_openai, execute_send_email
 
+      # 1. Initialize email client
+      gmail = await create_gmail_client()
+
+      # 2. Set up tool schema
       tools = [get_email_tool_schema_openai()]
+
+      # 3. Make API call with tool
       completion = await client.chat.completions.create(
           model="gpt-4",
           tools=tools,
           messages=[{"role": "user", "content": "Send an email..."}]
       )
+
+      # 4. Execute tool calls from response
+      for tool_call in completion.choices[0].message.tool_calls or []:
+          if tool_call.function.name == "send_email":
+              result = await execute_send_email(
+                  gmail,
+                  to=tool_call.function.arguments["to"],
+                  subject=tool_call.function.arguments["subject"],
+                  body=tool_call.function.arguments["body"],
+                  cc=tool_call.function.arguments.get("cc"),
+              )
+              print(f"Email send result: {result}")
 
 .. py:function:: get_email_tool_schema_ollama()
 
@@ -57,13 +95,33 @@ Tool Schemas
 
    .. code-block:: python
 
-      from pymailai.tools import get_email_tool_schema_ollama
+      from pymailai.gmail import create_gmail_client
+      from pymailai.tools import get_email_tool_schema_ollama, execute_send_email
 
+      # 1. Initialize email client
+      gmail = await create_gmail_client()
+
+      # 2. Set up tool schema
+      tools = [get_email_tool_schema_ollama()]
+
+      # 3. Make API call with tool
       response = ollama.chat(
           model="llama3.1",
-          tools=[get_email_tool_schema_ollama()],
+          tools=tools,
           messages=[{"role": "user", "content": "Send an email..."}]
       )
+
+      # 4. Execute tool calls from response
+      for tool_call in response["message"].get("tool_calls", []):
+          if tool_call["function"]["name"] == "send_email":
+              result = await execute_send_email(
+                  gmail,
+                  to=tool_call["function"]["arguments"]["to"],
+                  subject=tool_call["function"]["arguments"]["subject"],
+                  body=tool_call["function"]["arguments"]["body"],
+                  cc=tool_call["function"]["arguments"].get("cc"),
+              )
+              print(f"Email send result: {result}")
 
 Tool Execution
 -------------
@@ -104,6 +162,28 @@ Tool Execution
           cc=["cc@example.com"]
       )
       print(f"Email send result: {result}")
+
+Using the Email Tool
+----------------
+
+The process of using the email tool involves four main steps:
+
+1. Initialize the Email Client:
+   - Use create_gmail_client() or your preferred email client
+   - This provides the mechanism for actually sending emails
+
+2. Set up the Tool Schema:
+   - Choose the appropriate schema for your AI model
+   - Add it to the tools list in your API call
+
+3. Make the API Call:
+   - Include the tool schema in your model request
+   - The model will generate tool calls in its response
+
+4. Execute the Tool Calls:
+   - Process the tool calls from the model's response
+   - Use execute_send_email() to actually send the emails
+   - Handle the results appropriately
 
 Tool Schema Format
 ----------------
