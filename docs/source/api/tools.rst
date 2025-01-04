@@ -1,7 +1,12 @@
 Tools
 =====
 
-The ``tools`` module provides functionality for integrating email sending capabilities with AI models like Anthropic's Claude and OpenAI's GPT.
+The ``tools`` package provides functionality for integrating email sending capabilities with AI models like Anthropic's Claude and OpenAI's GPT. The package is organized into the following modules:
+
+* ``core``: Contains core email functionality (execute_query_emails, execute_send_email)
+* ``schemas``: Contains schema definitions for different AI models (Anthropic, OpenAI, Ollama)
+
+All functions are conveniently exposed at the package level for easy importing.
 
 Tool Schemas
 -----------
