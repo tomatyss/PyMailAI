@@ -102,25 +102,26 @@ class EmailAgent:
 
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
-                    # Still mark as read to avoid reprocessing, with retries
-                    if self._client:
-                        for attempt in range(max_retries):
-                            try:
-                                await self._client.mark_as_read(message.message_id)
-                                break
-                            except Exception as mark_err:
-                                if attempt == max_retries - 1:
-                                    logger.error(
-                                        f"Failed to mark errored message as read after {max_retries} attempts: {mark_err}",  # noqa E501
-                                        exc_info=True,
-                                    )
+                    # Only mark as read if we haven't already done so
+                    if not getattr(self.config, "mark_seen_immediately", True):
+                        if self._client:
+                            for attempt in range(max_retries):
+                                try:
+                                    await self._client.mark_as_read(message.message_id)
                                     break
-                                wait_time = min(2**attempt, 30)
-                                logger.warning(
-                                    f"Failed to mark errored message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
-                                    f"retrying in {wait_time} seconds: {mark_err}"
-                                )
-                                await asyncio.sleep(wait_time)
+                                except Exception as mark_err:
+                                    if attempt == max_retries - 1:
+                                        logger.error(
+                                            f"Failed to mark errored message as read after {max_retries} attempts: {mark_err}",  # noqa E501
+                                            exc_info=True,
+                                        )
+                                        break
+                                    wait_time = min(2**attempt, 30)
+                                    logger.warning(
+                                        f"Failed to mark errored message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
+                                        f"retrying in {wait_time} seconds: {mark_err}"
+                                    )
+                                    await asyncio.sleep(wait_time)
 
         except Exception as e:
             logger.error(f"Error fetching messages: {e}", exc_info=True)
