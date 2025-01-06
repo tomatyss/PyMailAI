@@ -300,3 +300,118 @@ class GmailClient(BaseEmailClient):
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.disconnect()
+
+    async def query_messages(
+        self, query_params: dict
+    ) -> AsyncGenerator[EmailData, None]:
+        """Query messages using Gmail API with specified parameters."""
+        try:
+            # Build Gmail API query string
+            query_parts = []
+
+            if query_params.get("after_date"):
+                query_parts.append(f"after:{query_params['after_date']}")
+            if query_params.get("before_date"):
+                query_parts.append(f"before:{query_params['before_date']}")
+            if query_params.get("subject"):
+                query_parts.append(f"subject:{query_params['subject']}")
+            if query_params.get("from_address"):
+                query_parts.append(f"from:{query_params['from_address']}")
+            if query_params.get("to_address"):
+                query_parts.append(f"to:{query_params['to_address']}")
+            if query_params.get("label"):
+                query_parts.append(f"label:{query_params['label']}")
+            if query_params.get("unread_only"):
+                query_parts.append("is:unread")
+
+            q = " ".join(query_parts)
+            logger.info(f"Executing Gmail query: {q}")
+
+            # Execute search
+            results = self.service.users().messages().list(userId="me", q=q).execute()
+
+            messages = results.get("messages", [])
+            if not messages:
+                logger.info("No messages found matching query")
+                return
+
+            logger.info(f"Found {len(messages)} matching messages")
+
+            for message in messages:
+                try:
+                    # Get full message data if body is requested, otherwise just metadata
+                    msg = (
+                        self.service.users()
+                        .messages()
+                        .get(
+                            userId="me",
+                            id=message["id"],
+                            format="full"
+                            if query_params.get("include_body")
+                            else "metadata",
+                            metadataHeaders=[
+                                "Subject",
+                                "From",
+                                "To",
+                                "Cc",
+                                "Date",
+                                "References",
+                                "In-Reply-To",
+                            ],
+                        )
+                        .execute()
+                    )
+
+                    # Extract headers
+                    headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
+
+                    # Extract body content if requested
+                    body_text = None
+                    body_html = None
+                    if query_params.get("include_body", False):
+                        body_text, body_html = self._extract_message_content(
+                            msg["payload"]
+                        )
+
+                    # Parse timestamp
+                    date_str = headers.get("Date")
+                    if date_str:
+                        timestamp = utils.parsedate_to_datetime(date_str)
+                    else:
+                        timestamp = datetime.fromtimestamp(
+                            int(msg["internalDate"]) / 1000
+                        )
+
+                    # Create EmailData
+                    email_data = EmailData(
+                        message_id=message["id"],
+                        subject=headers.get("Subject", ""),
+                        from_address=headers.get("From", ""),
+                        to_addresses=[
+                            addr.strip()
+                            for addr in headers.get("To", "").split(",")
+                            if addr.strip()
+                        ],
+                        cc_addresses=[
+                            addr.strip()
+                            for addr in headers.get("Cc", "").split(",")
+                            if addr.strip()
+                        ],
+                        body_text=body_text or "",
+                        body_html=body_html,
+                        timestamp=timestamp,
+                        references=[
+                            ref.strip()
+                            for ref in headers.get("References", "").split()
+                            if ref.strip()
+                        ],
+                        in_reply_to=headers.get("In-Reply-To", ""),
+                    )
+                    yield email_data
+
+                except Exception as e:
+                    logger.error(f"Failed to process message {message['id']}: {str(e)}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Failed to query messages: {str(e)}")

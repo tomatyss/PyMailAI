@@ -326,3 +326,138 @@ class EmailClient(BaseEmailClient):
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.disconnect()
+
+    async def query_messages(
+        self, query_params: dict
+    ) -> AsyncGenerator[EmailData, None]:
+        """Query messages using IMAP search criteria.
+
+        Args:
+            query_params: Dictionary containing query parameters:
+                - after_date: Optional[str] - Messages after this date (YYYY-MM-DD)
+                - before_date: Optional[str] - Messages before this date (YYYY-MM-DD)
+                - subject: Optional[str] - Subject line contains this text
+                - from_address: Optional[str] - Sender email address
+                - to_address: Optional[str] - Recipient email address
+                - label: Optional[str] - Message folder (defaults to INBOX)
+                - unread_only: Optional[bool] - Only unread messages if True
+                - include_body: Optional[bool] - Include message body in results
+        """
+        max_retries = 3
+        retry_count = 0
+
+        while retry_count < max_retries:
+            try:
+                await self._ensure_imap_connection()
+                imap = cast(aioimaplib.IMAP4_SSL, self._imap)
+
+                # Build IMAP search criteria
+                search_criteria = []
+
+                if query_params.get("after_date"):
+                    search_criteria.append(f'SINCE "{query_params["after_date"]}"')
+                if query_params.get("before_date"):
+                    search_criteria.append(f'BEFORE "{query_params["before_date"]}"')
+                if query_params.get("subject"):
+                    search_criteria.append(f'SUBJECT "{query_params["subject"]}"')
+                if query_params.get("from_address"):
+                    search_criteria.append(f'FROM "{query_params["from_address"]}"')
+                if query_params.get("to_address"):
+                    search_criteria.append(f'TO "{query_params["to_address"]}"')
+                if query_params.get("unread_only"):
+                    search_criteria.append("UNSEEN")
+
+                # If no criteria specified, search all messages
+                search_command = " ".join(search_criteria) if search_criteria else "ALL"
+                logger.debug(f"Executing IMAP search: {search_command}")
+
+                # Switch to requested folder/label if specified
+                if query_params.get("label"):
+                    await imap.select(query_params["label"])
+
+                # Execute search with timeout
+                _, data = await asyncio.wait_for(
+                    imap.search(search_command), timeout=self.config.timeout
+                )
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count == max_retries:
+                    logger.error(
+                        f"Failed to search messages after {max_retries} attempts: {e}"
+                    )
+                    raise
+                wait_time = min(2**retry_count, 30)
+                logger.warning(
+                    f"Error searching messages (attempt {retry_count}/{max_retries}), "
+                    f"retrying in {wait_time} seconds: {e}"
+                )
+                await asyncio.sleep(wait_time)
+
+        message_numbers = data[0].decode().split()
+        logger.debug(f"Found {len(message_numbers)} matching messages")
+
+        for num in message_numbers:
+            fetch_retries = 0
+            while fetch_retries < max_retries:
+                try:
+                    await self._ensure_imap_connection()
+                    imap = cast(aioimaplib.IMAP4_SSL, self._imap)
+
+                    # Fetch message data
+                    _, msg_data = await asyncio.wait_for(
+                        imap.fetch(
+                            num,
+                            "(RFC822)"
+                            if query_params.get("include_body")
+                            else "(RFC822.HEADER)",
+                        ),
+                        timeout=self.config.timeout,
+                    )
+                    if not msg_data or not msg_data[0]:
+                        logger.warning(f"No data returned for message {num}")
+                        break
+                    break
+                except Exception as e:
+                    fetch_retries += 1
+                    if fetch_retries == max_retries:
+                        logger.error(
+                            f"Failed to fetch message {num} after {max_retries} attempts: {e}"
+                        )
+                        break
+                    wait_time = min(2**fetch_retries, 30)
+                    logger.warning(
+                        f"Error fetching message {num} (attempt {fetch_retries}/{max_retries}), "
+                        f"retrying in {wait_time} seconds: {e}"
+                    )
+                    await asyncio.sleep(wait_time)
+
+            if fetch_retries == max_retries:
+                continue
+
+            # When using RFC822, the email data is always the second element in the response
+            email_body = msg_data[1]
+
+            if not email_body:
+                logger.warning(
+                    f"Could not find email body in message data for message {num}"
+                )
+                continue
+
+            # Parse email message
+            try:
+                email_message = email.message_from_bytes(
+                    email_body, policy=email.policy.default
+                )
+                if not isinstance(email_message, EmailMessage):
+                    # Convert Message to EmailMessage if needed
+                    temp_message = EmailMessage()
+                    temp_message.set_content(email_message.as_string())
+                    email_message = temp_message
+            except Exception as e:
+                logger.error(f"Failed to parse email message: {str(e)}")
+                continue
+
+            # Convert to our EmailData format
+            email_data = EmailData.from_email_message(email_message)
+            yield email_data

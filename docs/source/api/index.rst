@@ -10,3 +10,4 @@ This section provides detailed API documentation for pymailai's components.
    client
    config
    message
+   tools
