@@ -69,27 +69,28 @@ class EmailAgent:
                 response = None
 
                 try:
+                    # Mark message as read immediately if configured
+                    if getattr(self.config, "mark_seen_immediately", True):
+                        for attempt in range(max_retries):
+                            try:
+                                await self._client.mark_as_read(message.message_id)
+                                break
+                            except Exception as e:
+                                if attempt == max_retries - 1:
+                                    logger.error(
+                                        f"Failed to mark message as read after {max_retries} attempts: {e}",  # noqa E501
+                                        exc_info=True,
+                                    )
+                                    raise
+                                wait_time = min(2**attempt, 30)
+                                logger.warning(
+                                    f"Failed to mark message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
+                                    f"retrying in {wait_time} seconds: {e}"
+                                )
+                                await asyncio.sleep(wait_time)
+
                     # Process the message
                     response = await self.process_message(message)
-
-                    # Mark original message as read with retries
-                    for attempt in range(max_retries):
-                        try:
-                            await self._client.mark_as_read(message.message_id)
-                            break
-                        except Exception as e:
-                            if attempt == max_retries - 1:
-                                logger.error(
-                                    f"Failed to mark message as read after {max_retries} attempts: {e}",  # noqa E501
-                                    exc_info=True,
-                                )
-                                raise
-                            wait_time = min(2**attempt, 30)
-                            logger.warning(
-                                f"Failed to mark message as read (attempt {attempt + 1}/{max_retries}), "  # noqa E501
-                                f"retrying in {wait_time} seconds: {e}"
-                            )
-                            await asyncio.sleep(wait_time)
 
                     # Send response if one was generated
                     if response and self._client:

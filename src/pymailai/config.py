@@ -18,6 +18,7 @@ class EmailConfig:
     max_retries: int = 3
     timeout: int = 30  # seconds
     tls: bool = True
+    mark_seen_immediately: bool = True  # Mark messages as seen before processing
 
     def validate(self) -> None:
         """Validate configuration settings."""
