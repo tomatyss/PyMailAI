@@ -31,7 +31,7 @@ async def example_anthropic_gmail() -> None:
     response = await client.messages.create(
         model="claude-3-opus-20240229",
         max_tokens=1024,
-        tools=[get_email_tool_schema_anthropic()],
+        tools=get_email_tool_schema_anthropic(),
         messages=[
             {
                 "role": "user",
@@ -72,7 +72,7 @@ async def example_anthropic_smtp() -> None:
     response = await client.messages.create(
         model="claude-3-opus-20240229",
         max_tokens=1024,
-        tools=[get_email_tool_schema_anthropic()],
+        tools=get_email_tool_schema_anthropic(),
         messages=[
             {
                 "role": "user",
@@ -112,7 +112,7 @@ async def example_openai_gmail() -> None:
                 "content": "Please send an email to test@example.com with the subject 'Test Email' and body 'This is a test email sent via AI'",
             }
         ],
-        tools=[get_email_tool_schema_openai()],
+        tools=get_email_tool_schema_openai(),
     )
 
     # Process tool calls
@@ -152,7 +152,7 @@ async def example_openai_smtp() -> None:
                 "content": "Please send an email to test@example.com with the subject 'Test Email' and body 'This is a test email sent via AI'",
             }
         ],
-        tools=[get_email_tool_schema_openai()],
+        tools=get_email_tool_schema_openai(),
     )
 
     # Process tool calls
@@ -183,7 +183,7 @@ async def example_ollama_gmail() -> None:
                 "content": "Please send an email to test@example.com with the subject 'Test Email' and body 'This is a test email sent via AI'",
             }
         ],
-        tools=[get_email_tool_schema_ollama()],
+        tools=get_email_tool_schema_ollama(),
     )
 
     # Process tool calls
@@ -220,7 +220,7 @@ async def example_ollama_smtp() -> None:
                 "content": "Please send an email to test@example.com with the subject 'Test Email' and body 'This is a test email sent via AI'",
             }
         ],
-        tools=[get_email_tool_schema_ollama()],
+        tools=get_email_tool_schema_ollama(),
     )
 
     # Process tool calls

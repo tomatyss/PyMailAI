@@ -29,7 +29,7 @@ Tool Schemas
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
-      tools = [get_email_tool_schema_anthropic()]
+      tools = get_email_tool_schema_anthropic()
 
       # 3. Make API call with tool
       response = await client.messages.create(
@@ -70,7 +70,7 @@ Tool Schemas
       email_client = EmailClient(config)
 
       # 2. Set up tool schema
-      tools = [get_email_tool_schema_anthropic()]
+      tools = get_email_tool_schema_anthropic()
 
       # 3. Make API call with tool
       response = await client.messages.create(
@@ -109,7 +109,7 @@ Tool Schemas
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
-      tools = [get_email_tool_schema_openai()]
+      tools = get_email_tool_schema_openai()
 
       # 3. Make API call with tool
       completion = await client.chat.completions.create(
@@ -167,7 +167,7 @@ Tool Schemas
       gmail = await create_gmail_client()
 
       # 2. Set up tool schema
-      tools = [get_email_tool_schema_ollama()]
+      tools = get_email_tool_schema_ollama()
 
       # 3. Make API call with tool
       response = ollama.chat(
