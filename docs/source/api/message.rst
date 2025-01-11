@@ -41,11 +41,11 @@ EmailData
       )
 
       # Create a threaded reply
+      # The from_address will automatically be set to recipient@example.com
       reply = message.create_reply(
           reply_text="Thanks for your message!",
           include_history=True  # Include quoted original
       )
-      reply.from_address = "recipient@example.com"
 
    Key Methods
    ~~~~~~~~~~
@@ -53,6 +53,7 @@ EmailData
    create_reply(reply_text, include_history=True, quote_level=1)
       Create a properly threaded reply to this message.
 
+      - Automatically sets the from_address to the first recipient of the original message
       - Includes the original message as quoted text (if include_history=True)
       - Sets correct threading metadata (References and In-Reply-To headers)
       - Maintains CC recipients
@@ -65,6 +66,24 @@ EmailData
 
       Returns:
           EmailData: A new EmailData object configured as a reply
+
+      Example:
+          .. code-block:: python
+
+             # Original message sent to bot@example.com
+             original = EmailData(
+                 message_id="msg1",
+                 subject="Question",
+                 from_address="user@example.com",
+                 to_addresses=["bot@example.com"],
+                 body_text="What's the weather?"
+             )
+
+             # Create reply - from_address will be set to bot@example.com
+             reply = original.create_reply(
+                 reply_text="The weather is sunny!",
+                 include_history=True
+             )
 
    from_email_message(msg)
       Create EmailData from an email.message.EmailMessage object.

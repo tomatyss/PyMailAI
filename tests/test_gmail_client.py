@@ -71,26 +71,38 @@ async def test_fetch_new_messages_single_part(gmail_client, mock_gmail_service):
     """Test fetching single part text message."""
     mock_list = mock_gmail_service.users.return_value.messages.return_value.list
     mock_get = mock_gmail_service.users.return_value.messages.return_value.get
+    mock_threads = mock_gmail_service.users.return_value.threads.return_value.get
 
     mock_list.return_value.execute.return_value = {
         "messages": [{"id": "msg1"}]
     }
 
+    # Mock metadata request for thread ID
     mock_get.return_value.execute.return_value = {
         "id": "msg1",
-        "internalDate": "1706179200000",
-        "payload": {
-            "headers": [
-                {"name": "From", "value": "sender@example.com"},
-                {"name": "To", "value": "recipient@example.com"},
-                {"name": "Subject", "value": "Test Subject"},
-                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
-            ],
-            "mimeType": "text/plain",
-            "body": {
-                "data": base64.urlsafe_b64encode(b"Test message").decode()
+        "threadId": "thread1"
+    }
+
+    # Mock thread request
+    mock_threads.return_value.execute.return_value = {
+        "messages": [{
+            "id": "msg1",
+            "threadId": "thread1",
+            "internalDate": "1706179200000",
+            "payload": {
+                    "headers": [
+                        {"name": "From", "value": "sender@example.com"},
+                        {"name": "To", "value": "recipient@example.com"},
+                        {"name": "Subject", "value": "Test Subject"},
+                        {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"},
+                        {"name": "References", "value": ""}
+                    ],
+                "mimeType": "text/plain",
+                "body": {
+                    "data": base64.urlsafe_b64encode(b"Test message").decode()
+                }
             }
-        }
+        }]
     }
 
     messages = []
@@ -107,37 +119,49 @@ async def test_fetch_new_messages_multipart_alternative(gmail_client, mock_gmail
     """Test fetching multipart/alternative message with text and HTML parts."""
     mock_list = mock_gmail_service.users.return_value.messages.return_value.list
     mock_get = mock_gmail_service.users.return_value.messages.return_value.get
+    mock_threads = mock_gmail_service.users.return_value.threads.return_value.get
 
     mock_list.return_value.execute.return_value = {
         "messages": [{"id": "msg1"}]
     }
 
+    # Mock metadata request for thread ID
     mock_get.return_value.execute.return_value = {
         "id": "msg1",
-        "internalDate": "1706179200000",
-        "payload": {
-            "headers": [
-                {"name": "From", "value": "sender@example.com"},
-                {"name": "To", "value": "recipient@example.com"},
-                {"name": "Subject", "value": "Test Subject"},
-                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"}
-            ],
-            "mimeType": "multipart/alternative",
-            "parts": [
-                {
-                    "mimeType": "text/plain",
-                    "body": {
-                        "data": base64.urlsafe_b64encode(b"Plain text").decode()
+        "threadId": "thread1"
+    }
+
+    # Mock thread request
+    mock_threads.return_value.execute.return_value = {
+        "messages": [{
+            "id": "msg1",
+            "threadId": "thread1",
+            "internalDate": "1706179200000",
+            "payload": {
+                    "headers": [
+                        {"name": "From", "value": "sender@example.com"},
+                        {"name": "To", "value": "recipient@example.com"},
+                        {"name": "Subject", "value": "Test Subject"},
+                        {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"},
+                        {"name": "References", "value": ""}
+                    ],
+                "mimeType": "multipart/alternative",
+                "parts": [
+                    {
+                        "mimeType": "text/plain",
+                        "body": {
+                            "data": base64.urlsafe_b64encode(b"Plain text").decode()
+                        }
+                    },
+                    {
+                        "mimeType": "text/html",
+                        "body": {
+                            "data": base64.urlsafe_b64encode(b"<p>HTML content</p>").decode()
+                        }
                     }
-                },
-                {
-                    "mimeType": "text/html",
-                    "body": {
-                        "data": base64.urlsafe_b64encode(b"<p>HTML content</p>").decode()
-                    }
-                }
-            ]
-        }
+                ]
+            }
+        }]
     }
 
     messages = []
@@ -154,31 +178,42 @@ async def test_fetch_new_messages_multipart_mixed_nested(gmail_client, mock_gmai
     """Test fetching multipart/mixed message with nested multipart/alternative."""
     mock_list = mock_gmail_service.users.return_value.messages.return_value.list
     mock_get = mock_gmail_service.users.return_value.messages.return_value.get
+    mock_threads = mock_gmail_service.users.return_value.threads.return_value.get
 
     mock_list.return_value.execute.return_value = {
         "messages": [{"id": "msg1"}]
     }
 
+    # Mock metadata request for thread ID
     mock_get.return_value.execute.return_value = {
         "id": "msg1",
-        "internalDate": "1706179200000",
-        "payload": {
-            "headers": [
-                {"name": "From", "value": "sender@example.com"},
-                {"name": "To", "value": "recipient@example.com"},
-                {"name": "Subject", "value": "Test Subject"},
-                {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"},
-                {"name": "Message-ID", "value": "<test123@example.com>"}
-            ],
-            "mimeType": "multipart/mixed",
-            "parts": [
-                {
-                    "mimeType": "multipart/alternative",
-                    "parts": [
-                        {
-                            "mimeType": "text/plain",
-                            "body": {
-                                "data": base64.urlsafe_b64encode(b"""Hello!
+        "threadId": "thread1"
+    }
+
+    # Mock thread request
+    mock_threads.return_value.execute.return_value = {
+        "messages": [{
+            "id": "msg1",
+            "threadId": "thread1",
+            "internalDate": "1706179200000",
+            "payload": {
+                    "headers": [
+                        {"name": "From", "value": "sender@example.com"},
+                        {"name": "To", "value": "recipient@example.com"},
+                        {"name": "Subject", "value": "Test Subject"},
+                        {"name": "Date", "value": "Thu, 25 Jan 2024 10:00:00 +0000"},
+                        {"name": "Message-ID", "value": "<test123@example.com>"},
+                        {"name": "References", "value": ""}
+                    ],
+                "mimeType": "multipart/mixed",
+                "parts": [
+                    {
+                        "mimeType": "multipart/alternative",
+                        "parts": [
+                            {
+                                "mimeType": "text/plain",
+                                "body": {
+                                    "data": base64.urlsafe_b64encode(b"""Hello!
 
 Here's a test message with multiple sections:
 
@@ -193,25 +228,26 @@ Next steps:
 
 Best regards,
 Test User""").decode()
+                                }
+                            },
+                            {
+                                "mimeType": "text/html",
+                                "body": {
+                                    "data": base64.urlsafe_b64encode(b"""<div dir="ltr">Hello!<br><br>Here's a test message with multiple sections:<br><br>- Section 1: Testing<br>- Section 2: Verification<br>- Section 3: Validation<br><br>Next steps:<br>1. Check plain text extraction<br>2. Verify HTML content<br>3. Confirm attachment handling<br><br>Best regards,<br>Test User</div>""").decode()
+                                }
                             }
-                        },
-                        {
-                            "mimeType": "text/html",
-                            "body": {
-                                "data": base64.urlsafe_b64encode(b"""<div dir="ltr">Hello!<br><br>Here's a test message with multiple sections:<br><br>- Section 1: Testing<br>- Section 2: Verification<br>- Section 3: Validation<br><br>Next steps:<br>1. Check plain text extraction<br>2. Verify HTML content<br>3. Confirm attachment handling<br><br>Best regards,<br>Test User</div>""").decode()
-                            }
+                        ]
+                    },
+                    {
+                        "mimeType": "application/pdf",
+                        "filename": "test.pdf",
+                        "body": {
+                            "attachmentId": "attachment123"
                         }
-                    ]
-                },
-                {
-                    "mimeType": "application/pdf",
-                    "filename": "test.pdf",
-                    "body": {
-                        "attachmentId": "attachment123"
                     }
-                }
-            ]
-        }
+                ]
+            }
+        }]
     }
 
     messages = []

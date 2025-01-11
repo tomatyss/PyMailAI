@@ -38,6 +38,28 @@ class BaseEmailClient(ABC):
         """Mark a message as read."""
         pass
 
+    @abstractmethod
+    async def query_messages(
+        self, query_params: dict
+    ) -> AsyncGenerator[EmailData, None]:
+        """Query messages based on specified parameters.
+
+        Args:
+            query_params: Dictionary containing query parameters:
+                - after_date: Optional[str] - Messages after this date (YYYY-MM-DD)
+                - before_date: Optional[str] - Messages before this date (YYYY-MM-DD)
+                - subject: Optional[str] - Subject line contains this text
+                - from_address: Optional[str] - Sender email address
+                - to_address: Optional[str] - Recipient email address
+                - label: Optional[str] - Message label/folder
+                - unread_only: Optional[bool] - Only unread messages if True
+                - include_body: Optional[bool] - Include message body in results
+
+        Yields:
+            EmailData objects for matching messages
+        """
+        yield  # type: ignore
+
     async def __aenter__(self) -> "BaseEmailClient":
         """Async context manager entry."""
         await self.connect()

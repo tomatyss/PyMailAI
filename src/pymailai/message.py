@@ -1,11 +1,14 @@
 """Email message data structures and utilities."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from email import utils
 from email.message import EmailMessage
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
+from pymailai.email_processor import EmailProcessor
+from pymailai.email_reply import ReplyBuilder
+from pymailai.email_validator import EmailValidator
 from pymailai.markdown_converter import MarkdownConverter
 
 
@@ -17,76 +20,41 @@ class EmailData:
     subject: str
     from_address: str
     to_addresses: List[str]
-    cc_addresses: List[str]
-    body_text: str
-    body_html: Optional[str]
-    timestamp: datetime
-    references: Optional[Union[List[str], str]] = None
+    cc_addresses: List[str] = field(default_factory=list)
+    body_text: str = ""
+    body_html: Optional[str] = None
+    timestamp: datetime = field(default_factory=datetime.now)
+    references: List[str] = field(default_factory=list)
     in_reply_to: Optional[str] = None
-    attachments: List[Dict[str, Any]] = None  # type: ignore
+    attachments: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        """Initialize empty lists for None values and ensure references is a list."""
-        self.attachments = [] if self.attachments is None else self.attachments
+        """Initialize and validate email data."""
+        # Ensure references is a list of strings
+        if not isinstance(self.references, list):
+            raise ValueError("References must be a list of strings")
 
-        # Convert references to List[str]
-        if self.references is None:
-            self.references = []
-        elif isinstance(self.references, str):
-            # Convert string to list
-            self.references = (
-                [ref.strip() for ref in self.references.split()]
-                if self.references.strip()
-                else []
-            )
-        elif isinstance(self.references, list):
-            # Already a list, no need to cast
-            pass
-        else:
-            raise ValueError(
-                f"References must be None, string, or list, not {type(self.references)}"
-            )
+        # Clean up reference strings
+        self.references = [ref.strip() for ref in self.references if ref]
+
+        # Validate non-empty addresses
+        if self.from_address and not EmailValidator.validate_email(self.from_address):
+            raise ValueError(f"Invalid from address: {self.from_address}")
+
+        if self.to_addresses and not EmailValidator.validate_addresses(
+            self.to_addresses
+        ):
+            raise ValueError("Invalid to addresses")
+
+        if self.cc_addresses and not EmailValidator.validate_addresses(
+            self.cc_addresses
+        ):
+            raise ValueError("Invalid cc addresses")
 
     @classmethod
     def from_email_message(cls, msg: EmailMessage) -> "EmailData":
-        """Create EmailData from an email.message.EmailMessage object."""
-        body_text_parts = []
-        body_html = None
-        attachments = []
-
-        # Process message parts
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.is_multipart():
-                    continue
-
-                content_type = part.get_content_type()
-
-                # Handle attachments and inline images
-                disposition = part.get("Content-Disposition", "")
-                if "attachment" in disposition or content_type.startswith("image/"):
-                    attachments.append(
-                        {
-                            "filename": part.get_filename(),
-                            "content_type": content_type,
-                            "payload": part.get_payload(decode=True),
-                        }
-                    )
-                elif content_type == "text/plain":
-                    payload = part.get_payload(decode=True)
-                    assert isinstance(payload, bytes)  # type assertion for mypy
-                    body_text_parts.append(payload.decode())
-                elif content_type == "text/html":
-                    payload = part.get_payload(decode=True)
-                    assert isinstance(payload, bytes)  # type assertion for mypy
-                    body_html = payload.decode()
-        else:
-            payload = msg.get_payload(decode=True)
-            assert isinstance(payload, bytes)  # type assertion for mypy
-            body_text_parts.append(payload.decode())
-
-        # Combine all text parts
-        body_text = "\n".join(part for part in body_text_parts if part.strip())
+        """Create EmailData from an EmailMessage object."""
+        body_text, body_html, attachments = EmailProcessor.process_message_parts(msg)
 
         return cls(
             message_id=msg["Message-ID"] or "",
@@ -124,63 +92,6 @@ class EmailData:
         parsed = utils.parsedate_tz(date_str)
         return parsed if parsed is not None else default_tuple
 
-    def _format_quoted_text(self, text: str, level: int = 1) -> str:
-        """Format text with email-style quotation marks and attribution.
-
-        Args:
-            text: The text to quote
-            level: The quotation level (number of '>' characters to prepend)
-
-        Returns:
-            The quoted text with attribution and '>' characters prepended to each line
-        """
-        # Format the date to a readable string
-        date_str = self.timestamp.strftime("%b %d, %Y, at %I:%M %p")
-
-        # Create attribution line
-        attribution = f"On {date_str}, {self.from_address} wrote:"
-
-        # Format the quoted text with proper indentation
-        prefix = ">" * level
-        quoted_lines = []
-
-        # Split text into lines and process each line
-        lines = text.splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-
-            # Check if this line starts an embedded quote
-            if (
-                line.startswith("On ")
-                and i + 1 < len(lines)
-                and lines[i + 1].startswith(">")
-            ):
-                # Found an embedded quote, preserve its structure but add our quote level
-                quoted_lines.append(f"{prefix} {line}")
-                i += 1
-                while i < len(lines) and (
-                    lines[i].startswith(">") or not lines[i].strip()
-                ):
-                    if lines[i].startswith(">"):
-                        # Add our quote level to the existing quote
-                        quoted_lines.append(f"{prefix}{lines[i]}")
-                    else:
-                        # Empty line within quote
-                        quoted_lines.append(prefix)
-                    i += 1
-                continue
-
-            # Regular line
-            if line.strip():
-                quoted_lines.append(f"{prefix} {line}")
-            else:
-                quoted_lines.append(prefix)
-            i += 1
-
-        # Combine attribution with quoted text
-        return f"{attribution}\n{prefix}\n" + "\n".join(quoted_lines)
-
     def create_reply(
         self, reply_text: str, include_history: bool = True, quote_level: int = 1
     ) -> "EmailData":
@@ -190,30 +101,25 @@ class EmailData:
             reply_text: The text of the reply message
             include_history: Whether to include quoted message history
             quote_level: The quotation level for the previous message
-
-        Returns:
-            A new EmailData object configured as a reply to this message
         """
-        # Build references list
-        if isinstance(self.references, str):
-            # Convert string references to list before copying
-            new_references = (
-                [ref.strip() for ref in self.references.split()]
-                if self.references.strip()
-                else []
-            )
-        else:
-            # None or List[str]
-            new_references = [] if self.references is None else self.references.copy()
+        if not self.to_addresses:
+            raise ValueError("Cannot create reply: original message has no recipients")
 
+        # Build references list
+        new_references = list(self.references)  # Convert to list and copy
         if self.message_id:
             new_references.append(self.message_id)
 
-        # Format body text with quotations if including history
-        body_text = reply_text
-        if include_history:
-            quoted = self._format_quoted_text(self.body_text, quote_level)
-            body_text = f"{reply_text}\n\n{quoted}"
+        # Build reply body with proper formatting
+        body_text = ReplyBuilder.build_reply_body(
+            original_text=self.body_text,
+            reply_text=reply_text,
+            quote_level=quote_level,
+            include_history=include_history,
+            subject=self.subject,
+            timestamp=self.timestamp,
+            from_address=self.from_address,
+        )
 
         # Create reply email data
         return EmailData(
@@ -221,7 +127,7 @@ class EmailData:
             subject=f"Re: {self.subject}"
             if not self.subject.startswith("Re: ")
             else self.subject,
-            from_address="",  # Should be set by caller
+            from_address=self.to_addresses[0],  # Use the first recipient as sender
             to_addresses=[self.from_address],
             cc_addresses=self.cc_addresses,
             body_text=body_text,
@@ -229,11 +135,10 @@ class EmailData:
             timestamp=datetime.now(),
             references=new_references,
             in_reply_to=self.message_id,
-            attachments=[],
         )
 
     def to_email_message(self) -> EmailMessage:
-        """Convert EmailData to an email.message.EmailMessage object."""
+        """Convert EmailData to an EmailMessage object."""
         msg = EmailMessage()
         msg["Subject"] = self.subject
         msg["From"] = self.from_address
@@ -245,29 +150,43 @@ class EmailData:
         if self.references:
             msg["References"] = " ".join(self.references)
 
-        # Convert markdown to HTML if no HTML content is provided and text appears to be markdown
-        html_content = self.body_html
-        if not html_content and any(
+        # Convert markdown to HTML if needed
+        html_content = self._get_html_content()
+
+        # Set message content
+        self._set_message_content(msg, html_content)
+
+        return msg
+
+    def _get_html_content(self) -> Optional[str]:
+        """Get HTML content, converting from markdown if needed."""
+        if self.body_html:
+            return self.body_html
+
+        # Convert markdown to HTML if text appears to be markdown
+        if any(
             marker in self.body_text for marker in ["```", "#", "**", "__", ">", "-"]
         ):
             converter = MarkdownConverter()
-            html_content = converter.convert(self.body_text)
-        elif html_content:
-            # Use existing HTML content as is
-            html_content = self.body_html
+            return converter.convert(self.body_text)
 
-        # Start with mixed if we have attachments
+        return None
+
+    def _set_message_content(
+        self, msg: EmailMessage, html_content: Optional[str]
+    ) -> None:
+        """Set the message content including attachments."""
         if self.attachments:
             msg.make_mixed()
-
-            # Create content part
             content = EmailMessage()
+
             if html_content:
                 content.make_alternative()
                 content.add_alternative(self.body_text, subtype="plain")
                 content.add_alternative(html_content, subtype="html")
             else:
                 content.set_content(self.body_text)
+
             msg.attach(content)
 
             # Add attachments
@@ -286,5 +205,3 @@ class EmailData:
                 msg.add_alternative(html_content, subtype="html")
             else:
                 msg.set_content(self.body_text)
-
-        return msg
